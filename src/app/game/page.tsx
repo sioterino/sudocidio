@@ -9,7 +9,7 @@ import {
   SabotagePanel,
   OpponentPreview,
   AccusationButton,
-} from "@/components/gameplay";
+} from "@/src/components/gameplay"
 
 // Game data
 const clues = [

@@ -8,7 +8,7 @@ import {
   MenuButton,
   CharacterDecor,
   Footer,
-} from "@/components/menu";
+} from "@/src/components/menu";
 
 // SVG Icons for pixel-perfect rendering
 function PlayIcon() {

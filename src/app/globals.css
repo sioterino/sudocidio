@@ -1,7 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+@import "tailwindcss";
 :root {
   --wood-dark: #2d1b0e;
   --wood-medium: #4a2f18;

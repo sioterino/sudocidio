@@ -36,21 +36,21 @@ const clues = [
 ];
 
 const suspects = [
-  { id: "a", name: "Suspeito A", color: "#c94a4a", colorClass: "suspect-a", sprite: "/npcs/SMA-D.png" },
-  { id: "b", name: "Suspeito B", color: "#d4874d", colorClass: "suspect-b", sprite: "/npcs/SMB-G.png" },
-  { id: "c", name: "Suspeito C", color: "#d4b34d", colorClass: "suspect-c", sprite: "/npcs/SMW-A.png" },
-  { id: "d", name: "Suspeita D", color: "#4d9a4d", colorClass: "suspect-d", sprite: "/npcs/SFA-D.png" },
-  { id: "e", name: "Suspeita E", color: "#4d9a9a", colorClass: "suspect-e", sprite: "/npcs/SFB-G.png" },
-  { id: "f", name: "Suspeita F", color: "#8b4d8b", colorClass: "suspect-f", sprite: "/npcs/SFW-A.png" },
+  { id: "a", name: "Suspeito A", color: "#c94a4a", colorClass: "suspect-a", sprite: "/assets/npcs/SMA-D.png" },
+  { id: "b", name: "Suspeito B", color: "#d4874d", colorClass: "suspect-b", sprite: "/assets/npcs/SMB-G.png" },
+  { id: "c", name: "Suspeito C", color: "#d4b34d", colorClass: "suspect-c", sprite: "/assets/npcs/SMW-A.png" },
+  { id: "d", name: "Suspeita D", color: "#4d9a4d", colorClass: "suspect-d", sprite: "/assets/npcs/SFA-D.png" },
+  { id: "e", name: "Suspeita E", color: "#4d9a9a", colorClass: "suspect-e", sprite: "/assets/npcs/SFB-G.png" },
+  { id: "f", name: "Suspeita F", color: "#8b4d8b", colorClass: "suspect-f", sprite: "/assets/npcs/SFW-A.png" },
 ];
 
 const weapons = [
-  { id: "knife", name: "Faca", icon: "/weapons/knife.png" },
-  { id: "wrench", name: "Chave", icon: "/weapons/wrench.png" },
-  { id: "rope", name: "Corda", icon: "/weapons/rope.png" },
-  { id: "candle", name: "Vela", icon: "/weapons/candle.png" },
-  { id: "gun", name: "Pistola", icon: "/weapons/gun.png" },
-  { id: "poison", name: "Veneno", icon: "/weapons/poison.png" },
+  { id: "knife", name: "Faca", icon: "/assets/weapons/knife.png" },
+  { id: "wrench", name: "Chave", icon: "/assets/weapons/wrench.png" },
+  { id: "rope", name: "Corda", icon: "/assets/weapons/rope.png" },
+  { id: "candle", name: "Vela", icon: "/assets/weapons/candle.png" },
+  { id: "gun", name: "Pistola", icon: "/assets/weapons/gun.png" },
+  { id: "poison", name: "Veneno", icon: "/assets/weapons/poison.png" },
 ];
 
 const rooms = [

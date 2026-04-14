@@ -78,11 +78,12 @@ class HUDComponents {
             ...HUDStyles.hintsContainer,
             height: '250px',
             flexShrink: '0',
-            overflowY: 'auto',
-            // Estilos adicionais para scroll
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#ff9800 #2a2a2a'
+            overflowY: 'auto'
         }, hintsPanel);
+
+        // apply unsupported CSS отдельно
+        (this.hintsContainer.style as any).scrollbarWidth = 'thin';
+        (this.hintsContainer.style as any).scrollbarColor = '#ff9800 #2a2a2a';
         
         // Adiciona classe para scroll customizado
         this.hintsContainer.classList.add('custom-scroll');
@@ -103,10 +104,12 @@ class HUDComponents {
             ...HUDStyles.hintsLog,
             height: '120px',
             flexShrink: '0',
-            overflowY: 'auto',
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#ff9800 #2a2a2a'
+            overflowY: 'auto'
         }, hintsPanel);
+
+        // apply unsupported CSS отдельно
+        (this.hintsLogContainer.style as any).scrollbarWidth = 'thin';
+        (this.hintsLogContainer.style as any).scrollbarColor = '#ff9800 #2a2a2a';
         
         this.hintsLogContainer.classList.add('custom-scroll');
         

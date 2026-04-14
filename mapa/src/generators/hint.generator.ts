@@ -59,10 +59,38 @@ class HintGenerator {
         furniture: PlacedFurniture[],
         rooms: Room[]
     ): EntityHintSet[] {
-        return entities.suspects.map(suspect => {
+        const n = entities.suspects.length;
+
+        // Distribute initial hint levels across suspects based on total count.
+        // Formula: bottom third get 'easy', middle third get 'medium', top third get 'hard'.
+        // With very few suspects (1–2) they all start hard to keep the game challenging.
+        const levelForIndex = (i: number): HintLevel => {
+            if (n <= 2) return 'hard';
+            const third = n / 3;
+            if (i < third) return 'easy';
+            if (i < third * 2) return 'medium';
+            return 'hard';
+        };
+
+        // Shuffle suspect order so the level assignment isn't always
+        // "first suspect gets easy" — it feels random to the player.
+        const indices = [];
+        for (var i = 0; i < n; i++)
+            indices.push(i);
+
+        const shuffledIndices = Random.shuffle(indices);
+
+        return entities.suspects.map((suspect, originalIndex) => {
             const ladder = this.buildLadder(suspect, 'suspect', entities, furniture, rooms);
-            // Initial hint is the hardest (most vague) — macro first
-            const initialHint = ladder.find(h => h.level === 'hard') ?? ladder[ladder.length - 1];
+            const shuffledRank = shuffledIndices.indexOf(originalIndex);
+            const wantedLevel = levelForIndex(shuffledRank);
+
+            // Pick the hint at the wanted level; fall back to any available hint
+            const initialHint =
+                ladder.find(h => h.level === wantedLevel) ??
+                ladder.find(h => h.level === 'medium') ??
+                ladder[ladder.length - 1];
+
             const furtherHints = ladder.filter(h => h !== initialHint);
             return { entity: suspect, initialHint, furtherHints };
         });
@@ -148,7 +176,7 @@ class HintGenerator {
 
         // ── EASY 2: nearby furniture (radius 2) ────────────────────────────
         const nearby = this.getAdjacentFurniture(entity, furniture, 2)
-            .filter(f => !adjacent.includes(f));
+            .filter(function(f) { return adjacent.indexOf(f) === -1 });
         if (nearby.length > 0) {
             hints.push(this.hint(name, type, 'easy',
                 `${name} está próximo(a) de um(a) ${nearby[0].furniture.name}.`
@@ -158,7 +186,16 @@ class HintGenerator {
         // ── EASY 3: shares room with specific furniture ────────────────────
         const roomFurniture = furniture.filter(f => f.roomId === entity.roomId);
         if (roomFurniture.length > 0) {
-            const uniqueNames = [...new Set(roomFurniture.map(f => f.furniture.name))].slice(0, 2);
+
+            const names = roomFurniture.map(f => f.furniture.name);
+
+            let uniqueNames = [];
+            for (let i = 0; i < names.length; i++)
+                if (uniqueNames.indexOf(names[i]) === -1)
+                    uniqueNames.push(names[i]);
+
+            uniqueNames = uniqueNames.slice(0, 2);
+
             hints.push(this.hint(name, type, 'easy',
                 `${name} está no mesmo cômodo que um(a) ${uniqueNames.join(' e um(a) ')}.`
             ));
@@ -242,6 +279,7 @@ class HintGenerator {
         radius: number
     ): PlacedFurniture[] {
         return furniture.filter(f =>
+            f.roomId === entity.roomId &&                          // ← same room only
             Math.abs(f.tileX - entity.tileX) <= radius &&
             Math.abs(f.tileY - entity.tileY) <= radius &&
             !(f.tileX === entity.tileX && f.tileY === entity.tileY)
@@ -251,7 +289,19 @@ class HintGenerator {
     private static relativeDirection(from: PlacedEntity, to: PlacedFurniture): string {
         const dx = to.tileX - from.tileX;
         const dy = to.tileY - from.tileY;
-        if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'à direita de' : 'à esquerda de';
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        // Diagonal: both axes are non-zero and within a 2:1 ratio of each other
+        const isDiagonal = absDx > 0 && absDy > 0 && absDx <= absDy * 2 && absDy <= absDx * 2;
+
+        if (isDiagonal) {
+            const vDir = dy > 0 ? 'abaixo' : 'acima';
+            const hDir = dx > 0 ? 'à direita' : 'à esquerda';
+            return `na diagonal ${vDir}-${hDir} de`;   // e.g. "na diagonal abaixo-à-direita de"
+        }
+
+        if (absDx >= absDy) return dx > 0 ? 'à direita de' : 'à esquerda de';
         return dy > 0 ? 'abaixo de' : 'acima de';
     }
 

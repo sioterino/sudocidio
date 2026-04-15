@@ -7,7 +7,6 @@ import PlacementManager from '../core/placement.manager';
 import MapGenerator from '../generators/map.generator';
 import HintGenerator, { EntityHintSet, Hint } from '../generators/hint.generator';
 import HUDComponents from '../ui/HUD.component';
-import EntityPanel from '../ui/entity.panel';
 import GuessPanel, { Accusation } from '../ui/guess.panel';
 import Coordinates from '../utils/coordinates.utils';
 import DOMHelpers from '../utils/DOM.utils';
@@ -21,7 +20,6 @@ export class GameScene extends Scene {
     private highlightManager!: HighlightManager;
     private cameraController!: CameraController;
     private hud!: HUDComponents;
-    private entityPanel!: EntityPanel;
     private guessPanel!: GuessPanel;
     private placementManager!: PlacementManager;
 
@@ -73,8 +71,6 @@ export class GameScene extends Scene {
         if (this.mapData.furniture) {
             this.tilemapRenderer.renderFurniture(this.mapData.furniture);
         }
-        // NOTE: we no longer render entities via TilemapRenderer —
-        // PlacementManager handles all entity sprites so they are draggable.
     }
 
     // ─── HUD ──────────────────────────────────────────────────────────────────
@@ -91,15 +87,12 @@ export class GameScene extends Scene {
         };
         this.hud.setOnNewHintRequested(() => this.giveNewHint());
 
-        // Guess panel lives inside the HUD container (below hints)
-        // We find it via the hints panel's parent node
         this.setupGuessPanel(parent);
     }
 
     private setupGuessPanel(parent: HTMLElement): void {
         if (this.guessPanel) this.guessPanel.destroy();
 
-        // Attach to the same wrapper as the HUD; it will be appended last
         this.guessPanel = new GuessPanel(parent);
 
         this.guessPanel.setOnSubmit((accusation: Accusation) => {
@@ -117,22 +110,20 @@ export class GameScene extends Scene {
         }
     }
 
-    // ─── Entity panel (right sidebar) ─────────────────────────────────────────
+    // ─── Entity panel (Envia dados pro React) ─────────────────────────────────
 
     private setupEntityPanel(): void {
-        if (this.entityPanel) this.entityPanel.destroy();
-
-        const parent = document.getElementById('game-canvas-wrapper') ?? document.body;
-        this.entityPanel = new EntityPanel(parent, (_payload) => {
-            // drag start callback — we could add visual feedback here
-        });
-
         if (this.mapData.entities) {
-            this.entityPanel.populate(this.mapData.entities);
+            window.dispatchEvent(new CustomEvent('sudocidio:entitiesGenerated', {
+                detail: {
+                    suspects: this.mapData.entities.suspects.map(p => p.entity),
+                    weapons: this.mapData.entities.weapons.map(p => p.entity)
+                }
+            }));
         }
     }
 
-    // ─── Placement manager ────────────────────────────────────────────────────
+    // ─── Placement manager (Drag & Drop) ──────────────────────────────────────
 
     private setupPlacementManager(): void {
         if (this.placementManager) this.placementManager.reset();
@@ -142,30 +133,25 @@ export class GameScene extends Scene {
             this.mapData,
             () => this.tilemapRenderer.getLayer(),
             (tileX, tileY) => this.tilemapRenderer.getFurnitureAt(tileX, tileY),
-            (_placements) => {
-                // Called whenever placements change — could update a counter
-            }
+            (_placements) => {}
         );
 
-        // Wire map-dragging
         this.placementManager.setupMapDrag();
 
-        // Right-click to remove
+        // Avisa o React que tirou a peça (botão direito)
         this.placementManager.setupRemoveOnRightClick((entityName) => {
-            this.entityPanel.markUnplaced(entityName);
+            window.dispatchEvent(new CustomEvent('sudocidio:pieceRemoved', { detail: { name: entityName } }));
         });
 
-        // Wire HTML5 drag-drop from the entity panel onto the Phaser canvas
         const canvas = this.sys.game.canvas;
         this.placementManager.attachCanvasDropZone(
             canvas,
             (payload, screenX, screenY) => {
                 this.placementManager.handlePanelDrop(payload, screenX, screenY);
-                // Hide the card in the panel once placed
-                this.entityPanel.markPlaced(payload.entityId);
+                // Avisa o React que soltou a peça no mapa
+                window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name: payload.entityId } }));
             },
-            // onShowPlaced: mark card hidden (called after a successful drop)
-            (name) => this.entityPanel.markPlaced(name)
+            (name) => window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name } }))
         );
     }
 
@@ -222,17 +208,23 @@ export class GameScene extends Scene {
             this.mapData.rooms
         );
         
-        // Initialize unplaced entities (all entities start as unplaced)
-        this.mapData.entities.suspects.forEach(suspect => {
-            this.unplacedEntities.add(suspect.entity.name);
+        // 👉 AVISA O REACT DAS DICAS INICIAIS
+        this.hintSets.forEach(hintSet => {
+            window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
+                detail: {
+                    entityName: hintSet.entity.entity.name,
+                    entityType: hintSet.entity.type, 
+                    text: hintSet.initialHint.text,
+                    isInitial: true
+                }
+            }));
         });
-        this.mapData.entities.weapons.forEach(weapon => {
-            this.unplacedEntities.add(weapon.entity.name);
-        });
+
+        this.unplacedEntities = new Set<string>();
+        this.mapData.entities.suspects.forEach(s => this.unplacedEntities.add(s.entity.name));
+        this.mapData.entities.weapons.forEach(w => this.unplacedEntities.add(w.entity.name));
         this.unplacedEntities.add(this.mapData.entities.victim.entity.name);
         
-        // Display initial hints in HUD
-        this.hud.displayInitialHints(this.hintSets);
         this.hud.updateUnplacedCount(this.unplacedEntities.size);
     }
 
@@ -259,6 +251,11 @@ export class GameScene extends Scene {
         if (hint) {
             this.hud.addHintToLog(hint);
             this.showFloatingHint(hint);
+            
+            // 👉 AVISA O REACT DA NOVA DICA
+            window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
+                detail: hint
+            }));
         }
     }
 
@@ -291,7 +288,6 @@ export class GameScene extends Scene {
     private setupHoverInteraction(): void {
         this.input.off('pointermove');
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-            // Don't update hover cursor while dragging
             const layer = this.tilemapRenderer.getLayer();
             if (!layer) return;
 
@@ -316,7 +312,6 @@ export class GameScene extends Scene {
             this.hud.updateRoom(result.roomName);
             this.hud.updateCoordinates(tileX + 1, tileY + 1);
 
-            // Show placement info instead of the generator entity info
             const placed = this.placementManager.getAtTile(tileX, tileY);
             const furniture = this.tilemapRenderer.getFurnitureAt(tileX, tileY);
 
@@ -366,20 +361,14 @@ export class GameScene extends Scene {
 
         this.setupHighlightManager();
 
-        // Reset placements (destroys sprites)
         this.placementManager.reset();
-
         this.tilemapRenderer.destroy();
         this.renderCurrentMap();
 
-        // Repopulate panel
-        if (this.mapData.entities) {
-            this.entityPanel.populate(this.mapData.entities);
-        }
-
-        // Re-wire placement manager with new map data
+        // 👉 EVITA O CRASH: Envia os novos dados pro React em vez de usar this.entityPanel.populate()
+        this.setupEntityPanel();
+        
         this.setupPlacementManager();
-
         this.setupHints();
 
         if (this.hud.hintsLogContainer) {
@@ -389,7 +378,6 @@ export class GameScene extends Scene {
         this.hud.updateSeed(this.mapData.seed);
         this.hud.clearRoomInfo();
 
-        // Repopulate guess panel
         if (this.mapData.entities) {
             const suspectNames = this.mapData.entities.suspects.map(
                 p => (p.entity as Suspect).name

@@ -22,5 +22,12 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.addEventListener('load', () => {
-    new Phaser.Game(config);
+    const game = new Phaser.Game(config);
+
+    // gets rid of the context menu when the user right clicks to remove a entity from the map
+    setTimeout(() => {
+        const canvas = game.canvas;
+        if (canvas)
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    }, 0);
 });

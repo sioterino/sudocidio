@@ -3,7 +3,7 @@ const HUDStyles = {
     container: {
         position: 'fixed' as const,
         top: '20px',
-        left: '20px',
+        right: '20px',
         display: 'flex',
         flexDirection: 'column' as const,
         gap: '10px',
@@ -22,7 +22,7 @@ const HUDStyles = {
         display: 'flex',
         flexDirection: 'column' as const,
         gap: '4px',
-        minWidth: '200px'
+        minWidth: '50px'
     },
     seedRow: {
         display: 'flex',
@@ -68,7 +68,7 @@ const HUDStyles = {
         borderRadius: '8px',
         padding: '10px',
         border: '1px solid rgba(255, 152, 0, 0.3)',
-        width: '280px'
+        width: '180px',
     },
     hintsContainer: {
         display: 'flex',

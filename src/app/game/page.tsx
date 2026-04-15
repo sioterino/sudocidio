@@ -5,36 +5,14 @@ import {
   TopBar,
   CluesPanel,
   PiecesPanel,
-  MansionGrid,
   SabotagePanel,
   OpponentPreview,
   AccusationButton,
-} from "@/src/components/gameplay"
+  PhaserMapWrapper,
+} from "@/src/components/gameplay";
+import { ClueData } from "@/src/components/gameplay/CluesPanel";
 
-// Game data
-const clues = [
-  {
-    id: "1",
-    type: "location" as const,
-    text: "Vitima encontrada na GARAGEM. O corpo estava proximo a porta lateral.",
-  },
-  {
-    id: "2",
-    type: "witness" as const,
-    text: "Uma faca de cozinha foi relatada desaparecida pelo mordomo.",
-  },
-  {
-    id: "3",
-    type: "time" as const,
-    text: "O Suspeito A foi visto discutindo com a vitima por volta das 19h.",
-  },
-  {
-    id: "4",
-    type: "spatial" as const,
-    text: "Uma pista espacial sugere que o crime NAO ocorreu na Sala de Estar.",
-  },
-];
-
+// Game data (Apenas Suspeitos e Armas, pois o mapa agora é do Phaser)
 const suspects = [
   { id: "a", name: "Suspeito A", color: "#c94a4a", colorClass: "suspect-a", sprite: "/assets/npcs/SMA-D.png" },
   { id: "b", name: "Suspeito B", color: "#d4874d", colorClass: "suspect-b", sprite: "/assets/npcs/SMB-G.png" },
@@ -53,100 +31,6 @@ const weapons = [
   { id: "poison", name: "Veneno", icon: "/assets/weapons/poison.png" },
 ];
 
-const rooms = [
-  {
-    id: "garage",
-    name: "GARAGEM",
-    color: "#8b5a2b",
-    cells: [
-      { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
-      { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 },
-      { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 },
-    ],
-  },
-  {
-    id: "kitchen",
-    name: "COZINHA",
-    color: "#d4a574",
-    cells: [
-      { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 0, col: 5 },
-      { row: 1, col: 3 }, { row: 1, col: 4 }, { row: 1, col: 5 },
-    ],
-  },
-  {
-    id: "living",
-    name: "SALA",
-    color: "#c4894d",
-    cells: [
-      { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 0, col: 9 },
-      { row: 1, col: 6 }, { row: 1, col: 7 }, { row: 1, col: 8 }, { row: 1, col: 9 },
-      { row: 2, col: 6 }, { row: 2, col: 7 }, { row: 2, col: 8 }, { row: 2, col: 9 },
-    ],
-  },
-  {
-    id: "office",
-    name: "ESCRITORIO",
-    color: "#6b4423",
-    cells: [
-      { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 },
-      { row: 4, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 2 }, { row: 4, col: 3 },
-    ],
-  },
-  {
-    id: "hall",
-    name: "CORREDOR",
-    color: "#4a2f18",
-    cells: [
-      { row: 2, col: 3 }, { row: 2, col: 4 }, { row: 2, col: 5 },
-      { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 },
-      { row: 4, col: 4 }, { row: 4, col: 5 }, { row: 4, col: 6 },
-    ],
-  },
-  {
-    id: "bedroom",
-    name: "QUARTO",
-    color: "#8b4d8b",
-    cells: [
-      { row: 3, col: 7 }, { row: 3, col: 8 }, { row: 3, col: 9 },
-      { row: 4, col: 7 }, { row: 4, col: 8 }, { row: 4, col: 9 },
-    ],
-  },
-  {
-    id: "bathroom",
-    name: "BANHEIRO",
-    color: "#4d9a9a",
-    cells: [
-      { row: 5, col: 0 }, { row: 5, col: 1 },
-      { row: 6, col: 0 }, { row: 6, col: 1 },
-    ],
-  },
-  {
-    id: "garden",
-    name: "JARDIM",
-    color: "#4d9a4d",
-    cells: [
-      { row: 5, col: 2 }, { row: 5, col: 3 }, { row: 5, col: 4 }, { row: 5, col: 5 },
-      { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 },
-    ],
-  },
-  {
-    id: "library",
-    name: "BIBLIOTECA",
-    color: "#a86f3d",
-    cells: [
-      { row: 5, col: 6 }, { row: 5, col: 7 }, { row: 5, col: 8 }, { row: 5, col: 9 },
-      { row: 6, col: 6 }, { row: 6, col: 7 }, { row: 6, col: 8 }, { row: 6, col: 9 },
-    ],
-  },
-];
-
-// Pre-placed pieces (example state)
-const initialPlacedPieces = [
-  { row: 1, col: 1, type: "weapon" as const, id: "candle", label: "V", color: "#d4b34d" },
-  { row: 1, col: 7, type: "suspect" as const, id: "c", label: "C", color: "#d4b34d" },
-  { row: 0, col: 1, type: "clue" as const, id: "rope-clue", label: "?" },
-];
-
 // Opponent pieces for mini-map
 const opponentPieces = [
   { row: 0, col: 2 },
@@ -157,8 +41,37 @@ const opponentPieces = [
 
 export default function GamePage() {
   const [time, setTime] = useState(322);
-  const [placedPieces, setPlacedPieces] = useState(initialPlacedPieces);
   const [draggedPiece, setDraggedPiece] = useState<{ type: "suspect" | "weapon"; id: string } | null>(null);
+  
+  // ==========================================
+  // 📻 RÁDIO AMADOR: Estado real das Dicas
+  // ==========================================
+  const [activeClues, setActiveClues] = useState<ClueData[]>([]);
+
+  // Escuta os eventos disparados pelo Phaser da Sofia
+  useEffect(() => {
+    const handleNewHint = (event: Event) => {
+      const hintData = (event as CustomEvent).detail;
+      
+      setActiveClues((prev) => {
+        // Adiciona a dica no topo da lista com um ID gerado na hora
+        return [{
+          id: Math.random().toString(36).substring(7),
+          entityName: hintData.entityName,
+          entityType: hintData.entityType,
+          text: hintData.text
+        }, ...prev];
+      });
+    };
+
+    // Assina a frequência
+    window.addEventListener("sudocidio:newHint", handleNewHint);
+
+    // Limpa a assinatura quando sair da tela
+    return () => {
+      window.removeEventListener("sudocidio:newHint", handleNewHint);
+    };
+  }, []);
 
   // Timer countdown
   useEffect(() => {
@@ -176,30 +89,6 @@ export default function GamePage() {
 
   const handleDragStart = (type: "suspect" | "weapon", id: string) => {
     setDraggedPiece({ type, id });
-  };
-
-  const handleCellDrop = (row: number, col: number) => {
-    if (!draggedPiece) return;
-
-    const piece = draggedPiece.type === "suspect"
-      ? suspects.find((s) => s.id === draggedPiece.id)
-      : weapons.find((w) => w.id === draggedPiece.id);
-
-    if (piece) {
-      setPlacedPieces((prev) => [
-        ...prev.filter((p) => !(p.row === row && p.col === col)),
-        {
-          row,
-          col,
-          type: draggedPiece.type,
-          id: draggedPiece.id,
-          label: piece.name.charAt(0).toUpperCase(),
-          color: "color" in piece ? piece.color : "#d4a574",
-        },
-      ]);
-    }
-
-    setDraggedPiece(null);
   };
 
   const handleAccusation = () => {
@@ -228,7 +117,8 @@ export default function GamePage() {
         {/* Left Column */}
         <div className="w-52 flex flex-col gap-2 flex-shrink-0">
           <div className="flex-1 min-h-0">
-            <CluesPanel clues={clues} />
+            {/* Passando as dicas REAIS do estado para o painel */}
+            <CluesPanel clues={activeClues} />
           </div>
           <div className="flex-1 min-h-0">
             <PiecesPanel
@@ -239,13 +129,9 @@ export default function GamePage() {
           </div>
         </div>
 
-        {/* Center Column - Mansion Grid */}
-        <div className="flex-1 min-w-0">
-          <MansionGrid
-            rooms={rooms}
-            placedPieces={placedPieces}
-            onCellDrop={handleCellDrop}
-          />
+        {/* Center Column - Mapa Procedural da Sofia (Phaser) */}
+        <div className="flex-1 min-w-0 flex items-center justify-center">
+          <PhaserMapWrapper seed="1234" />
         </div>
 
         {/* Right Column */}

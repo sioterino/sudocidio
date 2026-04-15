@@ -78,7 +78,8 @@ class HUDComponents {
             ...HUDStyles.hintsContainer,
             height: '250px',
             flexShrink: '0',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            display: 'none'
         }, hintsPanel);
 
         // apply unsupported CSS отдельно

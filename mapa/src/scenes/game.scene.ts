@@ -118,6 +118,9 @@ export class GameScene extends Scene {
     /**
      * Sets up the hints system.
      */
+   /**
+     * Sets up the hints system.
+     */
     private setupHints(): void {
         if (!this.mapData.entities || !this.mapData.furniture) return;
         
@@ -128,6 +131,18 @@ export class GameScene extends Scene {
             this.mapData.rooms
         );
         
+        // 👉 CÓDIGO DA JÚLIA: "Sequestra" as DICAS INICIAIS e envia para o painel do React!
+        this.hintSets.forEach(hintSet => {
+            window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
+                detail: {
+                    entityName: hintSet.entity.entity.name,
+                    entityType: hintSet.entity.type, // suspect, weapon, etc
+                    text: hintSet.initialHint.text,
+                    isInitial: true
+                }
+            }));
+        });
+        
         // Initialize unplaced entities (all entities start as unplaced)
         this.mapData.entities.suspects.forEach(suspect => {
             this.unplacedEntities.add(suspect.entity.name);
@@ -137,8 +152,9 @@ export class GameScene extends Scene {
         });
         this.unplacedEntities.add(this.mapData.entities.victim.entity.name);
         
-        // Display initial hints in HUD
-        this.hud.displayInitialHints(this.hintSets);
+        // AVISO: Comentei a linha abaixo para as dicas não aparecerem duplicadas na tela da Sofia.
+        // this.hud.displayInitialHints(this.hintSets);
+        
         this.hud.updateUnplacedCount(this.unplacedEntities.size);
     }
     

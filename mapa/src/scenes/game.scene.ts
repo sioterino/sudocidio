@@ -141,6 +141,7 @@ export class GameScene extends Scene {
             this,
             this.mapData,
             () => this.tilemapRenderer.getLayer(),
+            (tileX, tileY) => this.tilemapRenderer.getFurnitureAt(tileX, tileY),
             (_placements) => {
                 // Called whenever placements change — could update a counter
             }

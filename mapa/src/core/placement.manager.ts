@@ -2,7 +2,9 @@
 import type { Scene } from 'phaser';
 import type { GameEntities, PlacedEntity, Suspect, Victim, Weapon } from '../types/npc.registry';
 import type { MapData } from '../types/interfaces';
-import type { DragPayload } from '../ui/entity-panel.component';
+import type { PlacedFurniture } from '../types/furniture.registry';
+import { OverlapType } from '../types/furniture.registry';
+import type { DragPayload } from '../ui/entity.panel';
 import Coordinates from '../utils/coordinates.utils';
 
 /**
@@ -43,6 +45,7 @@ class PlacementManager {
         private scene: Scene,
         private mapData: MapData,
         private getLayer: () => Phaser.Tilemaps.TilemapLayer | null,
+        private getFurnitureAt: (tileX: number, tileY: number) => PlacedFurniture | null,
         private onChange: OnPlacementChange
     ) {}
 
@@ -58,11 +61,12 @@ class PlacementManager {
 
         const tile = Coordinates.screenToTile(screenX, screenY, layer.x, layer.y, layer.scaleX);
         if (!tile) return;
-        if (!this.isValidFloorTile(tile.tileX, tile.tileY)) return;
 
-        // Find the entity object from mapData
+        // Find the entity object first so we know its type for the overlap check
         const entity = this.findEntityByName(payload.entityId, payload.entityType);
         if (!entity) return;
+
+        if (!this.isValidPlacement(tile.tileX, tile.tileY, payload.entityType)) return;
 
         // Remove any existing placement at that tile
         this.removePlacementAtTile(tile.tileX, tile.tileY);
@@ -119,8 +123,8 @@ class PlacementManager {
 
             const tile = this.pointerToTile(pointer);
 
-            // Dropped outside map or on a wall → return to original position
-            if (!tile || !this.isValidFloorTile(tile.tileX, tile.tileY)) {
+            // Dropped outside map, on a wall, or on incompatible furniture → snap back
+            if (!tile || !this.isValidPlacement(tile.tileX, tile.tileY, target.entityType)) {
                 target.sprite.setAlpha(1);
                 return;
             }
@@ -257,6 +261,7 @@ class PlacementManager {
         this.isDraggingFromMap = false;
     }
 
+
     // ─── Internal helpers ─────────────────────────────────────────────────────
 
     private createPlacement(
@@ -335,12 +340,42 @@ class PlacementManager {
         return found ? (found.entity as Weapon) : null;
     }
 
-    private isValidFloorTile(tileX: number, tileY: number): boolean {
+    /**
+     * Returns true when an entity of the given type may be placed on this tile.
+     *
+     * Rules (in order):
+     *  1. Must be within map bounds and be a floor tile (value >= 2).
+     *  2. If no furniture occupies the tile -> always allowed.
+     *  3. If furniture is present, check its OverlapType:
+     *       NONE        -> blocked for everyone
+     *       NPC_ONLY    -> allowed only for suspects / victims
+     *       WEAPON_ONLY -> allowed only for weapons
+     *       BOTH        -> allowed for everyone
+     */
+    private isValidPlacement(
+        tileX: number,
+        tileY: number,
+        entityType: 'suspect' | 'victim' | 'weapon'
+    ): boolean {
         const { tiles, width, height } = this.mapData;
         if (!Coordinates.isValidTile(tileX, tileY, width, height)) return false;
-        const value = tiles[tileY][tileX];
-        // Tile 0 = wall, 1 = void — both are impassable
-        return value >= 2;
+
+        // Tile 0 = wall, 1 = void - both impassable
+        if (tiles[tileY][tileX] < 2) return false;
+
+        const furniture = this.getFurnitureAt(tileX, tileY);
+        if (!furniture) return true; // bare floor - always valid
+
+        const { overlap } = furniture.furniture;
+        const isNpc = entityType === 'suspect' || entityType === 'victim';
+
+        switch (overlap) {
+            case OverlapType.NONE:        return false;
+            case OverlapType.NPC_ONLY:    return isNpc;
+            case OverlapType.WEAPON_ONLY: return entityType === 'weapon';
+            case OverlapType.BOTH:        return true;
+            default:                      return false;
+        }
     }
 
     private tileToPixel(tileX: number, tileY: number): { x: number; y: number } {

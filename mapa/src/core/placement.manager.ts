@@ -55,18 +55,18 @@ class PlacementManager {
      * Call this when a dragged card from the entity panel is dropped on the
      * Phaser canvas.  `screenX/Y` are the raw pointer coords over the canvas.
      */
-    handlePanelDrop(payload: DragPayload, screenX: number, screenY: number): void {
+    handlePanelDrop(payload: DragPayload, screenX: number, screenY: number): boolean {
         const layer = this.getLayer();
-        if (!layer) return;
+        if (!layer) return false;
 
         const tile = Coordinates.screenToTile(screenX, screenY, layer.x, layer.y, layer.scaleX);
-        if (!tile) return;
+        if (!tile) return false;
 
         // Find the entity object first so we know its type for the overlap check
         const entity = this.findEntityByName(payload.entityId, payload.entityType);
-        if (!entity) return;
+        if (!entity) return false;
 
-        if (!this.isValidPlacement(tile.tileX, tile.tileY, payload.entityType)) return;
+        if (!this.isValidPlacement(tile.tileX, tile.tileY, payload.entityType)) return false;
 
         // Remove any existing placement at that tile
         this.removePlacementAtTile(tile.tileX, tile.tileY);
@@ -75,6 +75,7 @@ class PlacementManager {
         this.removePlacementByName(payload.entityId);
 
         this.createPlacement(entity, payload.entityType, tile.tileX, tile.tileY);
+        return true;
     }
 
     // ─── Dragging sprites already on the map ─────────────────────────────────
@@ -187,8 +188,7 @@ class PlacementManager {
      */
     attachCanvasDropZone(
         canvas: HTMLCanvasElement,
-        onDrop: (payload: DragPayload, screenX: number, screenY: number) => void,
-        onShowPlaced: (name: string) => void
+        onDrop: (payload: DragPayload, screenX: number, screenY: number) => boolean
     ): void {
         canvas.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -203,7 +203,6 @@ class PlacementManager {
             try {
                 const payload = JSON.parse(raw) as DragPayload;
 
-                // Get position relative to the canvas
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
@@ -211,10 +210,6 @@ class PlacementManager {
                 const screenY = (e.clientY - rect.top) * scaleY;
 
                 onDrop(payload, screenX, screenY);
-
-                // If the entity was previously on the map it is now moved; hide
-                // the panel card (it was already hidden if placed before).
-                onShowPlaced(payload.entityId);
             } catch {
                 // ignore malformed data
             }
@@ -260,7 +255,6 @@ class PlacementManager {
         this.dragTarget = null;
         this.isDraggingFromMap = false;
     }
-
 
     // ─── Internal helpers ─────────────────────────────────────────────────────
 

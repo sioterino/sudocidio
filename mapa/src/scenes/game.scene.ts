@@ -23,7 +23,6 @@ export class GameScene extends Scene {
     private guessPanel!: GuessPanel;
     private placementManager!: PlacementManager;
 
-    // Hint properties
     private hintSets: EntityHintSet[] = [];
     private unplacedEntities: Set<string> = new Set();
 
@@ -48,7 +47,6 @@ export class GameScene extends Scene {
         this.setupHints();
 
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
-        // Escuta o botão de Acusação do React
         window.addEventListener('sudocidio:makeAccusation', () => this.evaluateReactAccusation());
 
         console.log(`Map generated with seed: ${this.mapData.seed}`);
@@ -58,8 +56,6 @@ export class GameScene extends Scene {
             console.log(`Vítima: ${(victim.entity as Victim).name}`);
         }
     }
-
-    // ─── Core setup ───────────────────────────────────────────────────────────
 
     private setupHighlightManager(): void {
         this.highlightManager = new HighlightManager(
@@ -76,8 +72,6 @@ export class GameScene extends Scene {
             this.tilemapRenderer.renderFurniture(this.mapData.furniture);
         }
     }
-
-    // ─── HUD ──────────────────────────────────────────────────────────────────
 
     private setupHUD(): void {
         DOMHelpers.removeElementById('game-hud');
@@ -114,8 +108,6 @@ export class GameScene extends Scene {
         }
     }
 
-    // ─── Entity panel (Envia dados pro React) ─────────────────────────────────
-
     private setupEntityPanel(): void {
         if (this.mapData.entities) {
             const allCharacters = [
@@ -131,8 +123,6 @@ export class GameScene extends Scene {
         }
     }
 
-    // ─── Placement manager (Drag & Drop) ──────────────────────────────────────
-
     private setupPlacementManager(): void {
         if (this.placementManager) this.placementManager.reset();
 
@@ -146,24 +136,24 @@ export class GameScene extends Scene {
 
         this.placementManager.setupMapDrag();
 
-        // Avisa o React que tirou a peça (botão direito)
         this.placementManager.setupRemoveOnRightClick((entityName) => {
             window.dispatchEvent(new CustomEvent('sudocidio:pieceRemoved', { detail: { name: entityName } }));
         });
 
         const canvas = this.sys.game.canvas;
+        
+        // 👉 CORREÇÃO DE SEGURANÇA: Usando apenas 2 argumentos + disparando o evento internamente.
         this.placementManager.attachCanvasDropZone(
             canvas,
             (payload, screenX, screenY) => {
-                this.placementManager.handlePanelDrop(payload, screenX, screenY);
-                // Avisa o React que soltou a peça no mapa
-                window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name: payload.entityId } }));
-            },
-            (name) => window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name } }))
+                const isSuccess = this.placementManager.handlePanelDrop(payload, screenX, screenY);
+                if (isSuccess) {
+                    window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name: payload.entityId } }));
+                }
+                return isSuccess;
+            }
         );
     }
-
-    // ─── Accusation evaluation ────────────────────────────────────────────────
 
     private evaluateAccusation(accusation: Accusation): boolean {
         if (!this.mapData.entities) return false;
@@ -205,8 +195,6 @@ export class GameScene extends Scene {
         });
     }
 
-    // ─── Hints ────────────────────────────────────────────────────────────────
-
     private setupHints(): void {
         if (!this.mapData.entities || !this.mapData.furniture) return;
 
@@ -216,7 +204,6 @@ export class GameScene extends Scene {
             this.mapData.rooms
         );
         
-        // 👉 AVISA O REACT DAS DICAS INICIAIS
         this.hintSets.forEach(hintSet => {
             window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
                 detail: {
@@ -260,7 +247,6 @@ export class GameScene extends Scene {
             this.hud.addHintToLog(hint);
             this.showFloatingHint(hint);
             
-            // 👉 AVISA O REACT DA NOVA DICA
             window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
                 detail: hint
             }));
@@ -290,8 +276,6 @@ export class GameScene extends Scene {
             onComplete: () => text.destroy(),
         });
     }
-
-    // ─── Hover ────────────────────────────────────────────────────────────────
 
     private setupHoverInteraction(): void {
         this.input.off('pointermove');
@@ -359,8 +343,6 @@ export class GameScene extends Scene {
         return Coordinates.isValidTile(tileX, tileY, this.mapData.width, this.mapData.height);
     }
 
-    // ─── Regenerate ───────────────────────────────────────────────────────────
-
     private async regenerateMap(): Promise<void> {
         const newSeed = this.hud.getSeedValue();
         this.hud.clearInput();
@@ -373,7 +355,6 @@ export class GameScene extends Scene {
         this.tilemapRenderer.destroy();
         this.renderCurrentMap();
 
-        // 👉 EVITA O CRASH: Envia os novos dados pro React em vez de usar this.entityPanel.populate()
         this.setupEntityPanel();
         
         this.setupPlacementManager();
@@ -399,14 +380,9 @@ export class GameScene extends Scene {
         console.log(`Map regenerated with seed: ${this.mapData.seed}`);
     }
 
-    // ─── React Accusation Evaluation ──────────────────────────────────────────
-
-       // ─── React Accusation Evaluation ──────────────────────────────────────────
-
     private evaluateReactAccusation(): void {
         if (!this.mapData.entities) return;
 
-        // 1. Confere se o jogador já colocou TODAS as peças no mapa
         if (!this.placementManager.allPlaced(this.mapData.entities)) {
             window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
                 detail: { success: false, message: 'Você precisa posicionar todas as peças no mapa primeiro!' }
@@ -415,35 +391,25 @@ export class GameScene extends Scene {
         }
 
         const allPlacements = this.placementManager.getAll();
-        const { suspects, weapons, victim } = this.mapData.entities; // Esse é o gabarito original!
+        const { suspects, weapons, victim } = this.mapData.entities; 
 
         let amountOfErrors = 0;
 
-        // Função auxiliar que checa se a peça está no quadradinho exato do gabarito
         const isPlacementCorrect = (correctEntity: any) => {
-            // Acha a peça que o jogador colocou pelo nome
             const placed = allPlacements.find(p => p.entityName === correctEntity.entity.name);
             
-            // Se não achou ou se o X e Y não baterem com o gabarito, conta como erro
             if (!placed || placed.tileX !== correctEntity.tileX || placed.tileY !== correctEntity.tileY) {
                 amountOfErrors++;
-                // Descomente a linha abaixo se quiser ver no Console do navegador quem você errou!
-                console.log(`Erro em: ${correctEntity.entity.name} | Certo: (${correctEntity.tileX}, ${correctEntity.tileY}) | Colocado: (${placed?.tileX}, ${placed?.tileY})`);
             }
         };
 
-        // 2. Verifica a posição exata da Vítima
+        // 👉 CORREÇÃO DE SEGURANÇA: Arrow functions blindam contra erros de aridade no array.forEach
         isPlacementCorrect(victim);
+        suspects.forEach(s => isPlacementCorrect(s));
+        weapons.forEach(w => isPlacementCorrect(w));
 
-        // 3. Verifica a posição exata de TODOS os Suspeitos
-        suspects.forEach(isPlacementCorrect);
-
-        // 4. Verifica a posição exata de TODAS as Armas
-        weapons.forEach(isPlacementCorrect);
-
-        // 5. Dá o veredito!
         if (amountOfErrors === 0) {
-            this.showVictoryEffect(); // Solta os fogos no mapa do Phaser
+            this.showVictoryEffect(); 
             window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
                 detail: { success: true, message: '🎉 PERFEITO! Você deduziu o local exato de cada pista e resolveu o caso!' }
             }));
@@ -453,4 +419,4 @@ export class GameScene extends Scene {
             }));
         }
     }
-    }
+}

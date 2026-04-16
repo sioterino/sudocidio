@@ -3,7 +3,7 @@ import { Scene } from 'phaser';
 import HighlightManager from '../components/highlight.manager';
 import CameraController from '../core/camera.controller';
 import TilemapRenderer from '../components/tilemap.renderer';
-import PlacementManager from '../core/placement.manager';
+import PlacementManager, { MapPlacement } from '../core/placement.manager';
 import MapGenerator from '../generators/map.generator';
 import HintGenerator, { EntityHintSet, Hint } from '../generators/hint.generator';
 import HUDComponents from '../ui/HUD.component';
@@ -134,6 +134,23 @@ export class GameScene extends Scene {
 
     // ─── Placement manager ────────────────────────────────────────────────────
 
+    private checkPlacements(placements: MapPlacement[]): void {
+        placements.forEach(p => {
+            const correct = this.placementManager.isCorrectPlacement(
+                p.entityName,
+                p.tileX,
+                p.tileY
+            );
+
+            // Visual feedback
+            if (correct) {
+                p.sprite.setTint(0x00ff00); // green
+            } else {
+                p.sprite.setTint(0xff0000); // red
+            }
+        });
+}
+
     private setupPlacementManager(): void {
         if (this.placementManager) this.placementManager.reset();
 
@@ -142,8 +159,8 @@ export class GameScene extends Scene {
             this.mapData,
             () => this.tilemapRenderer.getLayer(),
             (tileX, tileY) => this.tilemapRenderer.getFurnitureAt(tileX, tileY),
-            (_placements) => {
-                // Called whenever placements change — could update a counter
+            (placements) => {
+                this.checkPlacements(placements);
             }
         );
 

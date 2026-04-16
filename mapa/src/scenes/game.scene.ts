@@ -47,7 +47,9 @@ export class GameScene extends Scene {
         this.setupHints();
 
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
-        window.addEventListener('sudocidio:makeAccusation', () => this.evaluateReactAccusation());
+        
+        // 👉 Atualizado para receber dados do CustomEvent do React
+        window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
 
         console.log(`Map generated with seed: ${this.mapData.seed}`);
         if (this.mapData.entities) {
@@ -55,6 +57,7 @@ export class GameScene extends Scene {
             console.log(`Assassino: ${murderer.name} com ${killingWeapon.name}`);
             console.log(`Vítima: ${(victim.entity as Victim).name}`);
         }
+        
     }
 
     private setupHighlightManager(): void {
@@ -123,24 +126,22 @@ export class GameScene extends Scene {
         }
     }
 
-    // ─── Placement manager ────────────────────────────────────────────────────
-
     private checkPlacements(placements: MapPlacement[]): void {
-        placements.forEach(p => {
-            const correct = this.placementManager.isCorrectPlacement(
-                p.entityName,
-                p.tileX,
-                p.tileY
-            );
+        if (!this.mapData.entities) return;
+        
+        const { suspects, weapons, victim } = this.mapData.entities;
+        const allCorrectEntities = [...suspects, ...weapons, victim];
 
-            // Visual feedback
-            if (correct) {
-                p.sprite.setTint(0x00ff00); // green
+        placements.forEach(p => {
+            const correctEntity = allCorrectEntities.find(e => e.entity.name === p.entityName);
+            
+            if (correctEntity && p.tileX === correctEntity.tileX && p.tileY === correctEntity.tileY) {
+                p.sprite.setTint(0x00ff00); 
             } else {
-                p.sprite.setTint(0xff0000); // red
+                p.sprite.setTint(0xff0000); 
             }
         });
-}
+    }
 
     private setupPlacementManager(): void {
         if (this.placementManager) this.placementManager.reset();
@@ -163,7 +164,6 @@ export class GameScene extends Scene {
 
         const canvas = this.sys.game.canvas;
         
-        // 👉 CORREÇÃO DE SEGURANÇA: Usando apenas 2 argumentos + disparando o evento internamente.
         this.placementManager.attachCanvasDropZone(
             canvas,
             (payload, screenX, screenY) => {
@@ -226,8 +226,7 @@ export class GameScene extends Scene {
         );
         
         this.hintSets.forEach(hintSet => {
-           
-           const hintText = hintSet.initialHints && hintSet.initialHints.length > 0 
+            const hintText = hintSet.initialHints && hintSet.initialHints.length > 0 
                 ? hintSet.initialHints[0].text 
                 : "Sem dica disponível.";
             
@@ -406,43 +405,36 @@ export class GameScene extends Scene {
         console.log(`Map regenerated with seed: ${this.mapData.seed}`);
     }
 
-    private evaluateReactAccusation(): void {
+  private evaluateReactAccusation(event: CustomEvent): void {
         if (!this.mapData.entities) return;
 
-        if (!this.placementManager.allPlaced(this.mapData.entities)) {
+        // Pega apenas Arma e Assassino que vieram do React
+        const { weapon, murderer } = event.detail;
+
+        // O (str || "") impede o crash se o valor vier vazio ou undefined
+        const cleanStr = (str: string) => (str || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        // Pega o gabarito oficial da Engine
+        const { murderer: actualMurdererObj, killingWeapon } = this.mapData.entities;
+        
+        const actualMurderer = actualMurdererObj.name;
+        const actualWeapon = killingWeapon.name;
+
+        // Compara o texto do jogador com a verdade
+        const isWeaponCorrect = cleanStr(weapon) === cleanStr(actualWeapon);
+        const isMurdererCorrect = cleanStr(murderer) === cleanStr(actualMurderer);
+
+        // Se acertou os 2, Vitória!
+        if (isWeaponCorrect && isMurdererCorrect) {
+            this.showVictoryEffect(); 
             window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
-                detail: { success: false, message: 'Você precisa posicionar todas as peças no mapa primeiro!' }
+                detail: { success: true, message: '🎉 PERFEITO! Caso totalmente resolvido!' }
             }));
             return;
         }
-
-        const allPlacements = this.placementManager.getAll();
-        const { suspects, weapons, victim } = this.mapData.entities; 
-
-        let amountOfErrors = 0;
-
-        const isPlacementCorrect = (correctEntity: any) => {
-            const placed = allPlacements.find(p => p.entityName === correctEntity.entity.name);
-            
-            if (!placed || placed.tileX !== correctEntity.tileX || placed.tileY !== correctEntity.tileY) {
-                amountOfErrors++;
-            }
-        };
-
-        // 👉 CORREÇÃO DE SEGURANÇA: Arrow functions blindam contra erros de aridade no array.forEach
-        isPlacementCorrect(victim);
-        suspects.forEach(s => isPlacementCorrect(s));
-        weapons.forEach(w => isPlacementCorrect(w));
-
-        if (amountOfErrors === 0) {
-            this.showVictoryEffect(); 
-            window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
-                detail: { success: true, message: '🎉 PERFEITO! Você deduziu o local exato de cada pista e resolveu o caso!' }
-            }));
-        } else {
-            window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
-                detail: { success: false, message: `❌ Errado! Você errou a posição de ${amountOfErrors} peça(s). Reveja as dicas!` }
-            }));
-        }
+    
+        window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
+            detail: { success: false, message: `❌ Incorreto! Revise sua acusação..` }
+        }));
     }
 }

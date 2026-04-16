@@ -3,8 +3,8 @@ const HUDStyles = {
     container: {
         position: 'fixed' as const,
         top: '20px',
-        right: '20px',
-        display: 'flex',
+        left: '20px',
+        display: 'none',
         flexDirection: 'column' as const,
         gap: '10px',
         zIndex: '1000',

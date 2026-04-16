@@ -29,7 +29,8 @@ class GuessPanel {
         Object.assign(this.container.style, {
             position: 'fixed',          // <-- add this
             bottom: '10px',             // <-- distance from bottom
-            right: '10px',               // <-- distance from left
+            left: '10px', 
+            display: 'none',              // <-- distance from left
 
             background: 'rgba(0,0,0,0.90)',
             backdropFilter: 'blur(4px)',
@@ -88,7 +89,7 @@ class GuessPanel {
             marginTop: '6px',
             fontSize: '11px',
             textAlign: 'center',
-            minHeight: '10px',
+            minHeight: '16px',
             color: '#ccc',
         });
         this.container.appendChild(this.resultDiv);

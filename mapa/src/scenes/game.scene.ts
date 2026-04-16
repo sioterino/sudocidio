@@ -47,6 +47,10 @@ export class GameScene extends Scene {
         this.setupHoverInteraction();
         this.setupHints();
 
+        window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
+        // Escuta o botão de Acusação do React
+        window.addEventListener('sudocidio:makeAccusation', () => this.evaluateReactAccusation());
+
         console.log(`Map generated with seed: ${this.mapData.seed}`);
         if (this.mapData.entities) {
             const { murderer, killingWeapon, victim } = this.mapData.entities;
@@ -114,9 +118,13 @@ export class GameScene extends Scene {
 
     private setupEntityPanel(): void {
         if (this.mapData.entities) {
+            const allCharacters = [
+                ...this.mapData.entities.suspects.map(p => p.entity),
+                this.mapData.entities.victim.entity
+            ];
             window.dispatchEvent(new CustomEvent('sudocidio:entitiesGenerated', {
                 detail: {
-                    suspects: this.mapData.entities.suspects.map(p => p.entity),
+                    suspects: allCharacters,
                     weapons: this.mapData.entities.weapons.map(p => p.entity)
                 }
             }));
@@ -390,4 +398,59 @@ export class GameScene extends Scene {
 
         console.log(`Map regenerated with seed: ${this.mapData.seed}`);
     }
-}
+
+    // ─── React Accusation Evaluation ──────────────────────────────────────────
+
+       // ─── React Accusation Evaluation ──────────────────────────────────────────
+
+    private evaluateReactAccusation(): void {
+        if (!this.mapData.entities) return;
+
+        // 1. Confere se o jogador já colocou TODAS as peças no mapa
+        if (!this.placementManager.allPlaced(this.mapData.entities)) {
+            window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
+                detail: { success: false, message: 'Você precisa posicionar todas as peças no mapa primeiro!' }
+            }));
+            return;
+        }
+
+        const allPlacements = this.placementManager.getAll();
+        const { suspects, weapons, victim } = this.mapData.entities; // Esse é o gabarito original!
+
+        let amountOfErrors = 0;
+
+        // Função auxiliar que checa se a peça está no quadradinho exato do gabarito
+        const isPlacementCorrect = (correctEntity: any) => {
+            // Acha a peça que o jogador colocou pelo nome
+            const placed = allPlacements.find(p => p.entityName === correctEntity.entity.name);
+            
+            // Se não achou ou se o X e Y não baterem com o gabarito, conta como erro
+            if (!placed || placed.tileX !== correctEntity.tileX || placed.tileY !== correctEntity.tileY) {
+                amountOfErrors++;
+                // Descomente a linha abaixo se quiser ver no Console do navegador quem você errou!
+                console.log(`Erro em: ${correctEntity.entity.name} | Certo: (${correctEntity.tileX}, ${correctEntity.tileY}) | Colocado: (${placed?.tileX}, ${placed?.tileY})`);
+            }
+        };
+
+        // 2. Verifica a posição exata da Vítima
+        isPlacementCorrect(victim);
+
+        // 3. Verifica a posição exata de TODOS os Suspeitos
+        suspects.forEach(isPlacementCorrect);
+
+        // 4. Verifica a posição exata de TODAS as Armas
+        weapons.forEach(isPlacementCorrect);
+
+        // 5. Dá o veredito!
+        if (amountOfErrors === 0) {
+            this.showVictoryEffect(); // Solta os fogos no mapa do Phaser
+            window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
+                detail: { success: true, message: '🎉 PERFEITO! Você deduziu o local exato de cada pista e resolveu o caso!' }
+            }));
+        } else {
+            window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
+                detail: { success: false, message: `❌ Errado! Você errou a posição de ${amountOfErrors} peça(s). Reveja as dicas!` }
+            }));
+        }
+    }
+    }

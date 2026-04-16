@@ -32,13 +32,17 @@ export default function GamePage() {
         id: Math.random().toString(36).substring(7),
         entityName: hintData.entityName,
         entityType: hintData.entityType,
-        text: hintData.text
+        text: hintData.text,
+        isInitial: hintData.isInitial // 👉 Salva se é dica inicial para a estilização!
       }, ...prev]);
     };
 
     // Escuta a GERAÇÃO DOS PERSONAGENS REAIS
     const handleEntities = (event: Event) => {
       const data = (event as CustomEvent).detail;
+      
+      // 👉 Limpa as dicas do caso anterior se o mapa for reiniciado
+      setActiveClues([]); 
       
       // Mantemos a sua paleta de cores original e aplicamos nos dados da Sofia
       const colors = ["#c94a4a", "#d4874d", "#d4b34d", "#4d9a4d", "#4d9a9a", "#8b4d8b"];
@@ -49,8 +53,8 @@ export default function GamePage() {
         name: s.name,
         color: colors[index % colors.length],
         colorClass: colorClasses[index % colorClasses.length],
-        sprite: s.texturePath
-      }));
+        sprite: s.texturePath,
+        role: s.role === 'victim' ? 'victim' : 'suspect'      }));
 
       const mappedWeapons = data.weapons.map((w: any) => ({
         id: w.name,
@@ -93,7 +97,6 @@ export default function GamePage() {
             <CluesPanel clues={activeClues} />
           </div>
           <div className="flex-1 min-h-0">
-            {/* Enviando os dados dinâmicos para o seu painel */}
             <PiecesPanel suspects={gameSuspects} weapons={gameWeapons} />
           </div>
         </div>
@@ -105,7 +108,8 @@ export default function GamePage() {
         <div className="w-48 flex flex-col gap-2 flex-shrink-0">
           <SabotagePanel />
           <OpponentPreview progress={7} total={12} opponentPieces={opponentPieces} />
-          <AccusationButton onClick={() => alert("Acusacao Final!")} />
+          {/* 👉 O botão agora é limpo, toda a lógica está dentro dele! */}
+          <AccusationButton />
         </div>
       </div>
     </main>

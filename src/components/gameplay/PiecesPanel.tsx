@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { GripVertical, User, Wrench } from "lucide-react";
 import Image from "next/image";
 
-interface Suspect { id: string; name: string; color: string; colorClass: string; sprite: string; }
+// Adicionamos o 'role' na interface
+interface Suspect { id: string; name: string; color: string; colorClass: string; sprite: string; role?: string; }
 interface Weapon { id: string; name: string; icon: string; }
 interface PiecesPanelProps { suspects: Suspect[]; weapons: Weapon[]; }
 
 export function PiecesPanel({ suspects, weapons }: PiecesPanelProps) {
-  // Guarda quem já foi colocado no mapa
   const [placedPieces, setPlacedPieces] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -28,8 +28,8 @@ export function PiecesPanel({ suspects, weapons }: PiecesPanelProps) {
     }
   }, []);
 
-  // Lógica de empacotar a peça (Padrão exato da Sofia)
-  const handleDragStart = (e: React.DragEvent, type: "suspect" | "weapon", name: string) => {
+  // Agora aceitamos a string pura vinda do 'role'
+  const handleDragStart = (e: React.DragEvent, type: string, name: string) => {
     const payload = {
       sourceType: 'panel',
       entityId: name,
@@ -51,7 +51,7 @@ export function PiecesPanel({ suspects, weapons }: PiecesPanelProps) {
         {/* Suspects Section */}
         <div>
           <h4 className="text-[6px] uppercase tracking-wider text-wood-300 mb-2 flex items-center gap-1">
-            <User className="w-2.5 h-2.5" /> Suspeitos
+            <User className="w-2.5 h-2.5" /> Envolvidos
           </h4>
           <div className="grid grid-cols-2 gap-1.5">
             {suspects.map((suspect) => {
@@ -60,7 +60,8 @@ export function PiecesPanel({ suspects, weapons }: PiecesPanelProps) {
                 <div
                   key={suspect.id}
                   draggable={!isPlaced}
-                  onDragStart={(e) => handleDragStart(e, "suspect", suspect.name)}
+                  // 👉 USAMOS O ROLE AQUI (se não tiver, assume 'suspect')
+                  onDragStart={(e) => handleDragStart(e, suspect.role || "suspect", suspect.name)}
                   className={`piece ${suspect.colorClass} p-1.5 flex items-center gap-1.5 transition-all ${
                     isPlaced ? 'opacity-30 grayscale cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'
                   }`}

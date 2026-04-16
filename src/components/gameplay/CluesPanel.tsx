@@ -1,51 +1,72 @@
 "use client";
 
-import { FileText, MapPin, Clock, AlertTriangle } from "lucide-react";
+import { FileText } from "lucide-react";
 
-interface Clue {
+export interface ClueData {
   id: string;
-  type: "location" | "time" | "spatial" | "witness";
+  entityName: string;
+  entityType?: string; // 'suspect', 'weapon', 'victim', ou 'SISTEMA'
   text: string;
+  isInitial?: boolean; // Para sabermos se escrevemos "Dica inicial:" ou "Nova dica:"
 }
 
 interface CluesPanelProps {
-  clues: Clue[];
-}
-
-function ClueIcon({ type }: { type: Clue["type"] }) {
-  const iconClass = "w-3 h-3";
-  switch (type) {
-    case "location":
-      return <MapPin className={`${iconClass} text-suspect-cyan`} />;
-    case "time":
-      return <Clock className={`${iconClass} text-suspect-yellow`} />;
-    case "spatial":
-      return <AlertTriangle className={`${iconClass} text-suspect-orange`} />;
-    case "witness":
-      return <FileText className={`${iconClass} text-suspect-green`} />;
-  }
+  clues: ClueData[];
 }
 
 export function CluesPanel({ clues }: CluesPanelProps) {
   return (
-    <div className="panel flex flex-col h-full">
-      <div className="panel-header flex items-center gap-2">
-        <FileText className="w-3 h-3 text-cream-300" />
-        <span>Historico</span>
+    <div className="panel flex flex-col h-full bg-[#1a0f0a] border border-[#3d2516]">
+      {/* Título do Painel no estilo do jogo */}
+      <div className="panel-header flex items-center justify-center py-2 border-b border-[#3d2516]">
+        <span className="text-[#ffd700] font-bold text-[12px] tracking-widest uppercase">
+          Dicas
+        </span>
       </div>
       
-      <div className="flex-1 p-2 overflow-y-auto space-y-2">
-        {clues.map((clue) => (
-          <div
-            key={clue.id}
-            className="flex items-start gap-2 p-2 bg-wood-900/50 border border-wood-700"
-          >
-            <div className="mt-0.5 flex-shrink-0">
-              <ClueIcon type={clue.type} />
+      {/* Área de Scroll com as Dicas */}
+      <div className="flex-1 p-3 overflow-y-auto custom-scroll">
+        {clues.length === 0 && (
+          <p className="text-[9px] text-[#888888] text-center mt-4">
+            Aguardando dicas do sistema...
+          </p>
+        )}
+        
+        {clues.map((clue, index) => {
+          // Define a cor do cartão baseado no tipo (Personagem = Vermelho, Arma = Laranja)
+          const themeColor = clue.entityType === 'suspect' ? '#ff6666' : 
+                             clue.entityType === 'weapon' ? '#ffb74d' : 
+                             clue.entityType === 'SISTEMA' ? '#4d9a4d' : '#888888';
+
+          // As primeiras dicas geradas ao abrir o mapa consideramos "Iniciais"
+          const hintLabel = index > 5 ? "Nova dica:" : "Dica inicial:";
+
+          return (
+            <div
+              key={clue.id}
+              className="flex flex-col bg-black/50 rounded-md p-2.5 mb-3 border-l-[3px]"
+              style={{ borderColor: themeColor }}
+            >
+              {/* Nome do Personagem / Entidade */}
+              <span 
+                className="font-bold text-[11px] mb-1.5" 
+                style={{ color: themeColor }}
+              >
+                {clue.entityName}
+              </span>
+
+              {/* Subtítulo Dica (Amarelo) */}
+              <span className="text-[#ff9800] text-[9px] mb-1">
+                {hintLabel}
+              </span>
+
+              {/* Texto da Dica */}
+              <span className="text-[#cccccc] text-[10px] leading-relaxed">
+                {clue.text}
+              </span>
             </div>
-            <p className="text-[7px] text-cream-200 leading-relaxed">{clue.text}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

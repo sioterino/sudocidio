@@ -29,7 +29,8 @@ class GuessPanel {
         Object.assign(this.container.style, {
             position: 'fixed',          // <-- add this
             bottom: '10px',             // <-- distance from bottom
-            left: '10px',               // <-- distance from left
+            left: '10px', 
+            display: 'none',              // <-- distance from left
 
             background: 'rgba(0,0,0,0.90)',
             backdropFilter: 'blur(4px)',

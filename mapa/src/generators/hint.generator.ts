@@ -321,16 +321,16 @@ class HintGenerator {
 
         if (isDiagonal) {
             // FIX: in tile/screen coordinates Y increases downward, so dy > 0 → abaixo (below).
-            const vDir = dy > 0 ? 'abaixo' : 'acima';
+            const vDir = dy > 0 ? 'acima' : 'abaixo';
             // FIX: dx > 0 means the furniture is to the right.
-            const hDir = dx > 0 ? 'à direita' : 'à esquerda';
+            const hDir = dx > 0 ? 'à esquerda' : 'à direita';
             return `na diagonal ${vDir}-${hDir} de`;
         }
 
         // FIX: primary axis comparison was correct in structure but the
         // vertical labels were swapped. dy > 0 → target is lower on screen → abaixo.
-        if (absDx >= absDy) return dx > 0 ? 'à direita de' : 'à esquerda de';
-        return dy > 0 ? 'abaixo de' : 'acima de';
+        if (absDx >= absDy) return dx > 0 ? 'à esquerda de' : 'à direita de';
+        return dy > 0 ? 'acima de' : 'abaixo de';
     }
 
     // ── Portuguese grammar helpers ────────────────────────────────────────

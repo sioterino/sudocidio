@@ -5,7 +5,8 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Phaser](https://img.shields.io/badge/Phaser-20232A?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
+![rot.js](https://img.shields.io/badge/rot.js-20232A?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
 
 ## 📌 Sobre o Projeto
 

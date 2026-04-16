@@ -160,12 +160,10 @@ export class GameScene extends Scene {
         this.placementManager.attachCanvasDropZone(
             canvas,
             (payload, screenX, screenY) => {
-                this.placementManager.handlePanelDrop(payload, screenX, screenY);
-                // Hide the card in the panel once placed
-                this.entityPanel.markPlaced(payload.entityId);
-            },
-            // onShowPlaced: mark card hidden (called after a successful drop)
-            (name) => this.entityPanel.markPlaced(name)
+                const placed = this.placementManager.handlePanelDrop(payload, screenX, screenY);
+                if (placed) this.entityPanel.markPlaced(payload.entityId);
+                return placed;
+            }
         );
     }
 

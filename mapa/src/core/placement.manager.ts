@@ -389,6 +389,29 @@ class PlacementManager {
         if (!layer) return null;
         return Coordinates.screenToTile(pointer.x, pointer.y, layer.x, layer.y, layer.scaleX);
     }
+
+    // VERIFY IF ENTITY WAS PLACED IN THE CORRECT TILE =============================================
+
+    private getTrueEntity(name: string): PlacedEntity | null {
+        const { entities } = this.mapData;
+        if (!entities) return null;
+
+        const all = [
+            ...entities.suspects,
+            entities.victim,
+            ...entities.weapons
+        ];
+
+        return all.find(e => (e.entity as any).name === name) ?? null;
+    }
+
+    public isCorrectPlacement(name: string, tileX: number, tileY: number): boolean {
+        const real = this.getTrueEntity(name);
+        if (!real) return false;
+
+        return real.tileX === tileX && real.tileY === tileY;
+    }
+
 }
 
 export default PlacementManager;

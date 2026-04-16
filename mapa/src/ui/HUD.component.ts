@@ -171,14 +171,20 @@ class HUDComponents {
         let html = '';
         
         hintSets.forEach(hintSet => {
-            const suspectName = hintSet.entity.entity.name;
-            const initialHint = hintSet.initialHint;
+            const name = hintSet.entity.entity.name;
+            const hints = hintSet.initialHints;
+            
+            const hintsHtml = hints.map(h => `
+                <div style="margin-bottom: 4px;">
+                    <span style="color:#ff9800;">[${h.level}]</span>
+                    <span style="color:#ccc;"> ${h.text}</span>
+                </div>
+            `).join('');
             
             html += `
                 <div style="background: rgba(0,0,0,0.5); border-radius: 6px; padding: 8px; margin-bottom: 10px; border-left: 3px solid #ff4444;">
-                    <div style="font-weight: bold; font-size: 12px; color: #ff6666; margin-bottom: 5px;">${suspectName}</div>
-                    <div style="font-size: 11px; color: #ff9800; margin-bottom: 3px;">Dica inicial:</div>
-                    <div style="font-size: 11px; line-height: 1.3; color: #ccc;">${initialHint.text}</div>
+                    <div style="font-weight: bold; font-size: 12px; color: #ff6666; margin-bottom: 5px;">${name}</div>
+                    ${hintsHtml}
                 </div>
             `;
         });

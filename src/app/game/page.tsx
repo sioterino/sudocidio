@@ -33,7 +33,7 @@ export default function GamePage() {
         entityName: hintData.entityName,
         entityType: hintData.entityType,
         text: hintData.text,
-        isInitial: hintData.isInitial // 👉 Salva se é dica inicial para a estilização!
+        isInitial: hintData.isInitial
       }, ...prev]);
     };
 
@@ -41,10 +41,8 @@ export default function GamePage() {
     const handleEntities = (event: Event) => {
       const data = (event as CustomEvent).detail;
       
-      // 👉 Limpa as dicas do caso anterior se o mapa for reiniciado
       setActiveClues([]); 
       
-      // Mantemos a sua paleta de cores original e aplicamos nos dados da Sofia
       const colors = ["#c94a4a", "#d4874d", "#d4b34d", "#4d9a4d", "#4d9a9a", "#8b4d8b"];
       const colorClasses = ["suspect-a", "suspect-b", "suspect-c", "suspect-d", "suspect-e", "suspect-f"];
       
@@ -89,7 +87,10 @@ export default function GamePage() {
     <main className="h-screen w-screen flex flex-col bg-wood-900 overflow-hidden scanlines">
       <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: "url('/assets/floor/wooden.png')", backgroundRepeat: "repeat", backgroundSize: "64px 64px" }} />
 
-      <div className="relative z-10"><TopBar time={formatTime(time)} /></div>
+      {/* 👇 O SEGREDO ESTÁ AQUI: z-50 libera o modal para flutuar acima de tudo! */}
+      <div className="relative z-50">
+        <TopBar time={formatTime(time)} />
+      </div>
 
       <div className="flex-1 flex gap-2 p-2 min-h-0 relative z-10">
         <div className="w-52 flex flex-col gap-2 flex-shrink-0">
@@ -108,7 +109,6 @@ export default function GamePage() {
         <div className="w-48 flex flex-col gap-2 flex-shrink-0">
           <SabotagePanel />
           <OpponentPreview progress={7} total={12} opponentPieces={opponentPieces} />
-          {/* 👉 O botão agora é limpo, toda a lógica está dentro dele! */}
           <AccusationButton />
         </div>
       </div>

@@ -47,10 +47,13 @@ export class GameScene extends Scene {
         this.setupHints();
 
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
-        
-        // 👉 Atualizado para receber dados do CustomEvent do React
         window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
 
+        window.addEventListener('sudocidio:volumeChange', ((e: Event) => {
+            const data = (e as CustomEvent).detail;
+            this.sound.volume = data.volume;
+        }) as EventListener);
+        
         console.log(`Map generated with seed: ${this.mapData.seed}`);
         if (this.mapData.entities) {
             const { murderer, killingWeapon, victim } = this.mapData.entities;

@@ -57,8 +57,11 @@ export class GameScene extends Scene {
         console.log(`Map generated with seed: ${this.mapData.seed}`);
         if (this.mapData.entities) {
             const { murderer, killingWeapon, victim } = this.mapData.entities;
+            const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
+            const actualRoom = highlightResult.roomName || "Desconhecido";
             console.log(`Assassino: ${murderer.name} com ${killingWeapon.name}`);
             console.log(`Vítima: ${(victim.entity as Victim).name}`);
+            console.log(`Comodo: ${actualRoom}`)
         }
         
     }
@@ -412,23 +415,29 @@ export class GameScene extends Scene {
         if (!this.mapData.entities) return;
 
         // Pega apenas Arma e Assassino que vieram do React
-        const { weapon, murderer } = event.detail;
+        const { room, weapon, murderer } = event.detail;
 
         // O (str || "") impede o crash se o valor vier vazio ou undefined
         const cleanStr = (str: string) => (str || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         // Pega o gabarito oficial da Engine
-        const { murderer: actualMurdererObj, killingWeapon } = this.mapData.entities;
+        const { victim, murderer: actualMurdererObj, killingWeapon } = this.mapData.entities;
         
         const actualMurderer = actualMurdererObj.name;
         const actualWeapon = killingWeapon.name;
 
+
+        const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
+        const actualRoom = highlightResult.roomName || "Desconhecido";
+
+    
         // Compara o texto do jogador com a verdade
         const isWeaponCorrect = cleanStr(weapon) === cleanStr(actualWeapon);
         const isMurdererCorrect = cleanStr(murderer) === cleanStr(actualMurderer);
+        const isRoomCorrect = cleanStr(room) === cleanStr(actualRoom)
 
-        // Se acertou os 2, Vitória!
-        if (isWeaponCorrect && isMurdererCorrect) {
+        // Se acertou os  2, Vitória!
+        if (isRoomCorrect && isWeaponCorrect && isMurdererCorrect) {
             this.showVictoryEffect(); 
             window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
                 detail: { success: true, message: '🎉 PERFEITO! Caso totalmente resolvido!' }
@@ -440,4 +449,5 @@ export class GameScene extends Scene {
             detail: { success: false, message: `❌ Incorreto! Revise sua acusação..` }
         }));
     }
+   
 }

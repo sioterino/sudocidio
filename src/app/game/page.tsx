@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   TopBar,
   CluesPanel,
@@ -9,7 +10,9 @@ import {
   OpponentPreview,
   AccusationButton,
   PhaserMapWrapper,
+  GameOverModal,
 } from "@/src/components/gameplay";
+import type { GameOverReason } from "@/src/components/gameplay";
 import { ClueData } from "@/src/components/gameplay/CluesPanel";
 
 const opponentPieces = [
@@ -17,12 +20,25 @@ const opponentPieces = [
 ];
 
 export default function GamePage() {
-  const [time, setTime] = useState(322);
+  const router = useRouter();
+  const INITIAL_TIME = 322;
+  const [time, setTime] = useState(INITIAL_TIME);
   const [activeClues, setActiveClues] = useState<ClueData[]>([]);
   
   // ESTADOS COM OS DADOS REAIS DO JOGO
   const [gameSuspects, setGameSuspects] = useState<any[]>([]);
   const [gameWeapons, setGameWeapons] = useState<any[]>([]);
+  
+  // ESTADOS DO GAME OVER
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [gameOverData, setGameOverData] = useState<{
+    reason: GameOverReason;
+    murderer?: string;
+    weapon?: string;
+    room?: string;
+    opponentName?: string;
+    elapsedTime?: number;
+  } | null>(null);
 
   useEffect(() => {
     // Escuta as DICAS
@@ -73,14 +89,83 @@ export default function GamePage() {
     };
   }, []);
 
+  // LISTENER PARA GAME OVER (vitoria, tempo, oponente)
   useEffect(() => {
-    const timer = setInterval(() => setTime((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+    // Vitoria: jogador acertou a acusacao
+    const handleVictory = (event: Event) => {
+      const data = (event as CustomEvent).detail;
+      setGameOverData({
+        reason: "victory",
+        murderer: data.murderer,
+        weapon: data.weapon,
+        room: data.room,
+        elapsedTime: INITIAL_TIME - time, // Tempo decorrido = inicial - restante
+      });
+      setIsGameOver(true);
+    };
+
+    // Derrota: oponente resolveu primeiro (via WebSocket)
+    const handleOpponentWon = (event: Event) => {
+      const data = (event as CustomEvent).detail;
+      setGameOverData({
+        reason: "opponent_won",
+        murderer: data.murderer,
+        weapon: data.weapon,
+        room: data.room,
+        opponentName: data.opponentName || "Oponente",
+        elapsedTime: INITIAL_TIME - time,
+      });
+      setIsGameOver(true);
+    };
+
+    window.addEventListener("sudocidio:victory", handleVictory);
+    window.addEventListener("sudocidio:opponentWon", handleOpponentWon);
+
+    return () => {
+      window.removeEventListener("sudocidio:victory", handleVictory);
+      window.removeEventListener("sudocidio:opponentWon", handleOpponentWon);
+    };
+  }, [time]);
+
+  // TIMER - para o jogo quando o tempo acabar
+  useEffect(() => {
+    if (isGameOver) return; // Nao conta se ja acabou
+    
+    const timer = setInterval(() => {
+      setTime((prev) => {
+        if (prev <= 1) {
+          // Tempo esgotado!
+          setGameOverData({ 
+            reason: "time_up",
+            elapsedTime: INITIAL_TIME, // Usou todo o tempo
+          });
+          setIsGameOver(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
     return () => clearInterval(timer);
-  }, []);
+  }, [isGameOver]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     return `${mins.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  };
+
+  // Handlers do Game Over Modal
+  const handlePlayAgain = () => {
+    setIsGameOver(false);
+    setGameOverData(null);
+    setTime(INITIAL_TIME);
+    setActiveClues([]);
+    // Dispara evento para o Phaser regenerar o mapa
+    window.dispatchEvent(new CustomEvent("sudocidio:restartGame"));
+  };
+
+  const handleGoHome = () => {
+    router.push("/");
   };
 
   return (
@@ -109,9 +194,17 @@ export default function GamePage() {
         <div className="w-48 flex flex-col gap-2 flex-shrink-0">
           <SabotagePanel />
           <OpponentPreview progress={7} total={12} opponentPieces={opponentPieces} />
-          <AccusationButton />
+          <AccusationButton disabled={isGameOver} />
         </div>
       </div>
+
+      {/* MODAL DE FIM DE JOGO */}
+      <GameOverModal
+        isOpen={isGameOver}
+        data={gameOverData}
+        onPlayAgain={handlePlayAgain}
+        onGoHome={handleGoHome}
+      />
     </main>
   );
 }

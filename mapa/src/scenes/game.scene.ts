@@ -46,6 +46,10 @@ export class GameScene extends Scene {
         this.setupHoverInteraction();
         this.setupHints();
 
+        const restartGameHandler = () => {
+            this.regenerateMap();
+        };
+
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
         window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
 
@@ -449,5 +453,5 @@ export class GameScene extends Scene {
             detail: { success: false, message: `❌ Incorreto! Revise sua acusação..` }
         }));
     }
-   
+
 }

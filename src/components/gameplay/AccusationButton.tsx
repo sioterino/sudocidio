@@ -36,10 +36,18 @@ export function AccusationButton({ disabled }: AccusationButtonProps) {
       setIsSuccess(data.success);
 
       if (data.success) {
+        // Dispara evento de vitoria com os dados da solucao
+        window.dispatchEvent(new CustomEvent("sudocidio:victory", {
+          detail: {
+            murderer: data.murderer || murdererInput,
+            weapon: data.weapon || weaponInput,
+            room: data.room || roomInput,
+          }
+        }));
+        // Fecha o modal de acusacao apos um breve delay
         setTimeout(() => {
-          setResultMessage(null);
           setIsModalOpen(false);
-        }, 4000);
+        }, 500);
       } else {
         setTimeout(() => setResultMessage(null), 5000);
       }
@@ -47,7 +55,7 @@ export function AccusationButton({ disabled }: AccusationButtonProps) {
 
     window.addEventListener("sudocidio:accusationResult", handleResult);
     return () => window.removeEventListener("sudocidio:accusationResult", handleResult);
-  }, []);
+  }, [murdererInput, weaponInput, roomInput]);
 
   const handleAccusationClick = () => {
     // Exige que os 3 campos estejam preenchidos

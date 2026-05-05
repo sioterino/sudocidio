@@ -27,7 +27,7 @@ export default function GamePage() {
   const router = useRouter();
   
   // tempo de duração da partida em segundos
-  const INITIAL_TIME = 322;
+  const INITIAL_TIME = 180;
   
   // useState serve como a memória da página. qnd essas memórias mudam, a página se desenha de novo sozinha
   // memória do cronômetro

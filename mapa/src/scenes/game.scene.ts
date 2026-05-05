@@ -46,6 +46,10 @@ export class GameScene extends Scene {
         this.setupHoverInteraction();
         this.setupHints();
 
+        const restartGameHandler = () => {
+            this.regenerateMap();
+        };
+
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
         window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
 
@@ -59,10 +63,6 @@ export class GameScene extends Scene {
             const { murderer, killingWeapon, victim } = this.mapData.entities;
             const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
             const actualRoom = highlightResult.roomName || "Desconhecido";
-<<<<<<< HEAD
-            console.log(`Cena do Crime: ${actualRoom}`)
-=======
->>>>>>> 764716bb1a06ef916527af32132abbfa319039d9
             console.log(`Assassino: ${murderer.name} com ${killingWeapon.name}`);
             console.log(`Vítima: ${(victim.entity as Victim).name}`);
             console.log(`Comodo: ${actualRoom}`)
@@ -430,30 +430,17 @@ export class GameScene extends Scene {
         const actualMurderer = actualMurdererObj.name;
         const actualWeapon = killingWeapon.name;
 
-<<<<<<< HEAD
-        // Descobre onde a vítima está usando o HighlightManager
-        const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
-        const actualRoom = highlightResult.roomName || "Desconhecido";
-
-        // Compara o texto do jogador com a verdade (ignora maiúsculas e acentos)
-        const isRoomCorrect = cleanStr(room) === cleanStr(actualRoom);
-=======
 
         const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
         const actualRoom = highlightResult.roomName || "Desconhecido";
 
     
         // Compara o texto do jogador com a verdade
->>>>>>> 764716bb1a06ef916527af32132abbfa319039d9
         const isWeaponCorrect = cleanStr(weapon) === cleanStr(actualWeapon);
         const isMurdererCorrect = cleanStr(murderer) === cleanStr(actualMurderer);
         const isRoomCorrect = cleanStr(room) === cleanStr(actualRoom)
 
-<<<<<<< HEAD
-        // Se acertou os 2, Vitória!
-=======
         // Se acertou os  2, Vitória!
->>>>>>> 764716bb1a06ef916527af32132abbfa319039d9
         if (isRoomCorrect && isWeaponCorrect && isMurdererCorrect) {
             this.showVictoryEffect(); 
             window.dispatchEvent(new CustomEvent('sudocidio:accusationResult', {
@@ -466,9 +453,5 @@ export class GameScene extends Scene {
             detail: { success: false, message: `❌ Incorreto! Revise sua acusação..` }
         }));
     }
-<<<<<<< HEAD
-    
-=======
-   
->>>>>>> 764716bb1a06ef916527af32132abbfa319039d9
+
 }

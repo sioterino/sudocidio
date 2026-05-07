@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Press_Start_2P } from "next/font/google";
 import "./globals.css";
+import { MusicPlayerProvider } from "@/src/contexts/MusicPlayerContext";
+import { MusicPlayer } from "@/src/components/MusicPlayer";
 
 const pixelFont = Press_Start_2P({
   weight: "400",
@@ -27,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning> 
       <body className={`${pixelFont.variable} font-pixel antialiased`}>
-        {children}
+        <MusicPlayerProvider>
+          {children}
+          <MusicPlayer />
+        </MusicPlayerProvider>
       </body>
     </html>
   );

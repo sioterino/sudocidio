@@ -1,183 +1,152 @@
-import express from "express";
-import http from "http";
 import { Server, Socket } from "socket.io";
-import cors from "cors";
+import { createServer } from "http";
 
-const app = express();
-app.use(cors());
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+const httpServer = createServer();
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
 });
 
-interface RoomState {
-    players: string[];
-    seed: string;
-    solution: {
-        murderer: string;
-        weapon: string;
-        room: string;
-    } | null;
-    isGameOver: boolean;
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface Player {
+  socketId: string;
+  playerId: string;
+  playerName: string;
+  progress: number;
 }
 
-const activeRooms = new Map<string, RoomState>();
-let waitingPlayer: Socket | null = null;
-
-function generateRoomSeed(): string {
-    return Date.now().toString();
+interface Room {
+  roomId: string;
+  seed: string;
+  players: Player[];
+  status: "WAITING_FOR_OPPONENT" | "PLAYING" | "FINISHED";
 }
+
+// ─── Estado em memória ────────────────────────────────────────────────────────
+
+const rooms = new Map<string, Room>();
+let waitingPlayer: Player | null = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function finishRoom(
+  roomId: string,
+  winnerId: string,
+  reason: "ACCUSATION_CORRECT" | "OPPONENT_SURRENDERED" | "OPPONENT_DISCONNECTED" | "TIME_OUT"
+) {
+  const room = rooms.get(roomId);
+  if (!room || room.status === "FINISHED") return;
+  room.status = "FINISHED";
+  io.to(roomId).emit("GAME_OVER", { winnerId, reason });
+  rooms.delete(roomId);
+  console.log(`[Room] ${roomId} encerrada → vencedor: ${winnerId} (${reason})`);
+}
+
+function findRoomBySocket(socketId: string): [string, Room] | null {
+  for (const [roomId, room] of rooms.entries()) {
+    if (room.players.some((p) => p.socketId === socketId)) return [roomId, room];
+  }
+  return null;
+}
+
+// ─── Eventos ──────────────────────────────────────────────────────────────────
 
 io.on("connection", (socket: Socket) => {
-    console.log(`jogador conectou: ${socket.id}`);
+  console.log(`[Socket] Conectado: ${socket.id}`);
 
-    // ENTRAR NA FILA / SALA
-    socket.on("JOIN_ROOM", () => {
-        if (waitingPlayer && waitingPlayer.id !== socket.id) {
-            const roomId = `room_${waitingPlayer.id}_${socket.id}`;
-            const seed = generateRoomSeed();
+  // 1. MATCHMAKING
+  socket.on("JOIN_ROOM", (payload: { playerId: string; playerName: string }) => {
+    const newPlayer: Player = {
+      socketId: socket.id,
+      playerId: payload.playerId,
+      playerName: payload.playerName,
+      progress: 0,
+    };
 
-            waitingPlayer.join(roomId);
-            socket.join(roomId);
+    if (waitingPlayer && waitingPlayer.socketId !== socket.id) {
+      const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const seed = Date.now().toString();
 
-            activeRooms.set(roomId, {
-                players: [waitingPlayer.id, socket.id],
-                seed,
-                solution: null,
-                isGameOver: false,
-            });
+      const room: Room = {
+        roomId,
+        seed,
+        players: [waitingPlayer, newPlayer],
+        status: "PLAYING",
+      };
 
-            // Todos recebem a MESMA seed — ninguém gera caso localmente
-            io.to(roomId).emit("GAME_START", { roomId, seed });
+      rooms.set(roomId, room);
 
-            console.log(`Sala ${roomId} criada com seed ${seed}`);
-            waitingPlayer = null;
-        } else {
-            waitingPlayer = socket;
-            socket.emit("ROOM_JOINED", { roomId: "pending", status: "WAITING_FOR_OPPONENT" });
-        }
-    });
+      const waitingSocket = io.sockets.sockets.get(waitingPlayer.socketId);
+      if (waitingSocket) waitingSocket.join(roomId);
+      socket.join(roomId);
 
-    // CLIENTE REPORTA A SOLUÇÃO DO CASO (gerada deterministicamente pela seed)
-    // O primeiro cliente a reportar define a solução canônica da sala.
-    socket.on("REPORT_SOLUTION", (data: {
-        roomId: string;
-        murderer: string;
-        weapon: string;
-        room: string;
-    }) => {
-        const roomState = activeRooms.get(data.roomId);
-        if (!roomState) return;
+      waitingPlayer = null;
 
-        // Só aceita a primeira notificação — evita divergências
-        if (!roomState.solution) {
-            roomState.solution = {
-                murderer: data.murderer,
-                weapon: data.weapon,
-                room: data.room,
-            };
-            console.log(`Solução registrada na sala ${data.roomId}:`, roomState.solution);
-        }
-    });
+      io.to(roomId).emit("GAME_START", { roomId, seed });
+      console.log(`[Room] ${roomId} criada | seed: ${seed}`);
+    } else {
+      waitingPlayer = newPlayer;
+      socket.emit("ROOM_JOINED", { roomId: "queue", status: "WAITING_FOR_OPPONENT" });
+      console.log(`[Queue] ${payload.playerName} aguardando...`);
+    }
+  });
 
-    // ACUSAÇÃO DO JOGADOR — validação centralizada no servidor
-    socket.on("PLAYER_ACCUSATION", (data: {
-        roomId: string;
-        murderer: string;
-        weapon: string;
-        room: string;
-    }) => {
-        const roomState = activeRooms.get(data.roomId);
-        if (!roomState || roomState.isGameOver || !roomState.solution) return;
+  // 2. PROGRESSO
+  socket.on("PIECE_PLACED", (payload: { roomId: string; playerId: string; progress: number }) => {
+    socket.to(payload.roomId).emit("OPPONENT_PROGRESS", { opponentProgress: payload.progress });
 
-        const normalize = (s: string) =>
-            (s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const room = rooms.get(payload.roomId);
+    if (room) {
+      const player = room.players.find((p) => p.playerId === payload.playerId);
+      if (player) player.progress = payload.progress;
+    }
+  });
 
-        const sol = roomState.solution;
-        const correct =
-            normalize(data.murderer) === normalize(sol.murderer) &&
-            normalize(data.weapon)   === normalize(sol.weapon)   &&
-            normalize(data.room)     === normalize(sol.room);
+  // 3. SABOTAGENS
+  socket.on("SEND_SABOTAGE", (payload: { roomId: string; playerId: string; sabotageType: string }) => {
+    socket.to(payload.roomId).emit("RECEIVE_SABOTAGE", { sabotageType: payload.sabotageType });
+    console.log(`[Sabotage] ${payload.sabotageType} → sala ${payload.roomId}`);
+  });
 
-        if (correct) {
-            // Bloqueia qualquer outra acusação simultânea (race condition)
-            roomState.isGameOver = true;
+  // 4. FIM DE JOGO
+  socket.on("MAKE_ACCUSATION", (payload: { roomId: string; playerId: string; isCorrect: boolean }) => {
+    if (!payload.isCorrect) return;
+    finishRoom(payload.roomId, payload.playerId, "ACCUSATION_CORRECT");
+  });
 
-            // Vencedor
-            socket.emit("GAME_OVER", {
-                winnerId: socket.id,
-                isWinner: true,
-                reason: "victory",
-                murderer: sol.murderer,
-                weapon: sol.weapon,
-                room: sol.room,
-            });
+  socket.on("SURRENDER", (payload: { roomId: string; playerId: string }) => {
+    const room = rooms.get(payload.roomId);
+    if (!room) return;
+    const opponent = room.players.find((p) => p.playerId !== payload.playerId);
+    finishRoom(payload.roomId, opponent?.playerId || "OPPONENT", "OPPONENT_SURRENDERED");
+  });
 
-            // Perdedores
-            socket.to(data.roomId).emit("GAME_OVER", {
-                winnerId: socket.id,
-                isWinner: false,
-                reason: "opponent_won",
-                murderer: sol.murderer,
-                weapon: sol.weapon,
-                room: sol.room,
-            });
+  // 5. DESCONEXÃO
+  socket.on("disconnect", () => {
+    console.log(`[Socket] Desconectado: ${socket.id}`);
 
-            console.log(`Partida encerrada na sala ${data.roomId}. Vencedor: ${socket.id}`);
-        } else {
-            socket.emit("ACCUSATION_RESULT", { correct: false });
-        }
-    });
+    if (waitingPlayer?.socketId === socket.id) {
+      waitingPlayer = null;
+      return;
+    }
 
-    // PROGRESSO DE PEÇAS
-    socket.on("PIECE_PLACED", (data: { playerId: string; progress: number }) => {
-        for (const [roomId, roomState] of activeRooms.entries()) {
-            if (roomState.players.includes(socket.id)) {
-                socket.to(roomId).emit("OPPONENT_PROGRESS", data);
-                break;
-            }
-        }
-    });
+    const entry = findRoomBySocket(socket.id);
+    if (!entry) return;
 
-    // JOGAR NOVAMENTE
-    socket.on("RESTART_MATCH", (data: { roomId: string }) => {
-        if (data.roomId) {
-            socket.leave(data.roomId);
-            activeRooms.delete(data.roomId);
-        }
-    });
+    const [roomId, room] = entry;
+    if (room.status !== "PLAYING") return;
 
-    // DESCONEXÃO
-    socket.on("disconnect", () => {
-        console.log(`jogador desconectou: ${socket.id}`);
-
-        if (waitingPlayer?.id === socket.id) {
-            waitingPlayer = null;
-            return;
-        }
-
-        for (const [roomId, roomState] of activeRooms.entries()) {
-            if (!roomState.players.includes(socket.id)) continue;
-
-            if (!roomState.isGameOver) {
-                roomState.isGameOver = true;
-                socket.to(roomId).emit("GAME_OVER", {
-                    winnerId: "opponent",
-                    isWinner: true,
-                    reason: "opponent_disconnected",
-                    murderer: roomState.solution?.murderer,
-                    weapon: roomState.solution?.weapon,
-                    room: roomState.solution?.room,
-                });
-            }
-
-            activeRooms.delete(roomId);
-            break;
-        }
-    });
+    const opponent = room.players.find((p) => p.socketId !== socket.id);
+    finishRoom(roomId, opponent?.playerId || "OPPONENT", "OPPONENT_DISCONNECTED");
+  });
 });
 
-server.listen(3001, () => console.log("servidor multiplayer rodando na porta 3001"));
+// ─── Start ────────────────────────────────────────────────────────────────────
+
+const PORT = Number(process.env.PORT) || 3001;
+httpServer.listen(PORT, () => {
+  console.log(`[Server] Rodando em http://localhost:${PORT}`);
+});

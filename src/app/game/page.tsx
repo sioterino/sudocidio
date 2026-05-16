@@ -140,24 +140,14 @@ function GamePageInner() {
 
   // Progresso de peças → reporta ao servidor
   useEffect(() => {
-    const handlePiecePlaced = () => {
-      const next = currentProgress + 1;
-      setCurrentProgress(next);
-      reportProgress(next);
+    const handleProgress = (event: Event) => {
+      const { correctCount } = (event as CustomEvent).detail;
+      setCurrentProgress(correctCount);
+      reportProgress(correctCount);
     };
-    const handlePieceRemoved = () => {
-      const next = Math.max(0, currentProgress - 1);
-      setCurrentProgress(next);
-      reportProgress(next);
-    };
-    window.addEventListener("sudocidio:piecePlaced", handlePiecePlaced);
-    window.addEventListener("sudocidio:pieceRemoved", handlePieceRemoved);
-    return () => {
-      window.removeEventListener("sudocidio:piecePlaced", handlePiecePlaced);
-      window.removeEventListener("sudocidio:pieceRemoved", handlePieceRemoved);
-    };
-  }, [currentProgress, reportProgress]);
-
+    window.addEventListener('sudocidio:progressUpdate', handleProgress);
+    return () => window.removeEventListener('sudocidio:progressUpdate', handleProgress);
+  }, [reportProgress]);
   // Progresso do adversário vindo do servidor
   useEffect(() => {
     const handleOpponentProgress = (event: Event) => {
@@ -328,13 +318,7 @@ function GamePageInner() {
             opponentPieces={[]}
           />
           <AccusationButton disabled={isGameOver} />
-          <button
-            onClick={giveUp}
-            disabled={isGameOver}
-            className="w-full py-2 px-3 text-[9px] uppercase tracking-widest text-wood-400 border border-wood-700 hover:border-blood-600 hover:text-blood-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Desistir
-          </button>
+
         </div>
       </div>
 

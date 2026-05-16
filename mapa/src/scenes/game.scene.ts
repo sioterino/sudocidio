@@ -16,9 +16,9 @@ import type { PlacedFurniture } from '../types/furniture.registry';
 
 // Declara o global para o TypeScript não reclamar
 declare global {
-  interface Window {
-    __sudocidio_seed?: string;
-  }
+    interface Window {
+        __sudocidio_seed?: string;
+    }
 }
 
 export class GameScene extends Scene {
@@ -56,13 +56,16 @@ export class GameScene extends Scene {
         this.setupHoverInteraction();
         this.setupHints();
 
+        window.addEventListener('sudocidio:applySabotage', ((e: Event) => {
+            this.applySabotage((e as CustomEvent).detail.sabotageType);
+        }) as EventListener);
         window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
         window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
         window.addEventListener('sudocidio:volumeChange', ((e: Event) => {
             const data = (e as CustomEvent).detail;
             this.sound.volume = data.volume;
         }) as EventListener);
-        
+
         console.log(`[GameScene] Seed usada: ${this.mapData.seed} (fonte: ${seedFromReact ? 'multiplayer' : seedFromUrl ? 'url' : 'aleatória'})`);
 
         if (this.mapData.entities) {
@@ -138,20 +141,28 @@ export class GameScene extends Scene {
 
     private checkPlacements(placements: MapPlacement[]): void {
         if (!this.mapData.entities) return;
-        
+
         const { suspects, weapons, victim } = this.mapData.entities;
         const allCorrectEntities = [...suspects, ...weapons, victim];
 
+        // Conta quantas estão corretas agora
+        let correctCount = 0;
+
         placements.forEach(p => {
             const correctEntity = allCorrectEntities.find(e => e.entity.name === p.entityName);
+
             if (correctEntity && p.tileX === correctEntity.tileX && p.tileY === correctEntity.tileY) {
                 p.sprite.setTint(0x00ff00);
+                correctCount++;
             } else {
                 p.sprite.setTint(0xff0000);
             }
         });
-    }
 
+        window.dispatchEvent(new CustomEvent('sudocidio:progressUpdate', {
+            detail: { correctCount }
+        }));
+    }
     private setupPlacementManager(): void {
         if (this.placementManager) this.placementManager.reset();
 
@@ -160,7 +171,7 @@ export class GameScene extends Scene {
             this.mapData,
             () => this.tilemapRenderer.getLayer(),
             (tileX, tileY) => this.tilemapRenderer.getFurnitureAt(tileX, tileY),
-            (placements) => { this.checkPlacements(placements); }
+            (placements: MapPlacement[]) => { this.checkPlacements(placements); }
         );
 
         this.placementManager.setupMapDrag();
@@ -174,7 +185,19 @@ export class GameScene extends Scene {
             (payload, screenX, screenY) => {
                 const isSuccess = this.placementManager.handlePanelDrop(payload, screenX, screenY);
                 if (isSuccess) {
-                    window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', { detail: { name: payload.entityId } }));
+                    // Busca a posição atual da peça que acabou de ser colocada
+                    const placement = this.placementManager.getByName(payload.entityId);
+
+                    if (placement && this.placementManager.isCorrectPlacement(
+                        payload.entityId,
+                        placement.tileX,
+                        placement.tileY
+                    )) {
+                        // Só conta progresso se estiver no lugar certo
+                        window.dispatchEvent(new CustomEvent('sudocidio:piecePlaced', {
+                            detail: { name: payload.entityId }
+                        }));
+                    }
                 }
                 return isSuccess;
             }
@@ -185,7 +208,7 @@ export class GameScene extends Scene {
         if (!this.mapData.entities) return false;
         const { murderer, killingWeapon } = this.mapData.entities;
         const murdererCorrect = accusation.murdererName === murderer.name;
-        const weaponCorrect   = accusation.weaponName   === killingWeapon.name;
+        const weaponCorrect = accusation.weaponName === killingWeapon.name;
         if (murdererCorrect && weaponCorrect) {
             this.showVictoryEffect();
             return true;
@@ -224,12 +247,12 @@ export class GameScene extends Scene {
             this.mapData.furniture,
             this.mapData.rooms
         );
-        
+
         this.hintSets.forEach(hintSet => {
-            const hintText = hintSet.initialHints && hintSet.initialHints.length > 0 
-                ? hintSet.initialHints[0].text 
+            const hintText = hintSet.initialHints && hintSet.initialHints.length > 0
+                ? hintSet.initialHints[0].text
                 : "Sem dica disponível.";
-            
+
             window.dispatchEvent(new CustomEvent('sudocidio:newHint', {
                 detail: {
                     entityName: hintSet.entity.entity.name,
@@ -244,7 +267,7 @@ export class GameScene extends Scene {
         this.mapData.entities.suspects.forEach(s => this.unplacedEntities.add(s.entity.name));
         this.mapData.entities.weapons.forEach(w => this.unplacedEntities.add(w.entity.name));
         this.unplacedEntities.add(this.mapData.entities.victim.entity.name);
-        
+
         this.hud.updateUnplacedCount(this.unplacedEntities.size);
     }
 
@@ -346,7 +369,7 @@ export class GameScene extends Scene {
 
     private getPlacedDisplayName(type: 'suspect' | 'victim' | 'weapon', name: string): string {
         if (type === 'suspect') return `suspeito: ${name}`;
-        if (type === 'victim')  return `vítima: ${name}`;
+        if (type === 'victim') return `vítima: ${name}`;
         return `arma: ${name}`;
     }
 
@@ -403,9 +426,9 @@ export class GameScene extends Scene {
         const highlightResult = this.highlightManager.highlight(victim.tileX, victim.tileY);
         const actualRoom = highlightResult.roomName || "Desconhecido";
 
-        const isWeaponCorrect   = cleanStr(weapon)   === cleanStr(actualWeapon);
-        const isMurdererCorrect = cleanStr(murderer)  === cleanStr(actualMurderer);
-        const isRoomCorrect     = cleanStr(room)      === cleanStr(actualRoom);
+        const isWeaponCorrect = cleanStr(weapon) === cleanStr(actualWeapon);
+        const isMurdererCorrect = cleanStr(murderer) === cleanStr(actualMurderer);
+        const isRoomCorrect = cleanStr(room) === cleanStr(actualRoom);
 
         if (isRoomCorrect && isWeaponCorrect && isMurdererCorrect) {
             this.showVictoryEffect();
@@ -419,4 +442,142 @@ export class GameScene extends Scene {
             detail: { success: false, message: `❌ Incorreto! Revise sua acusação..` }
         }));
     }
+    private applySabotage(type: 'BLIND' | 'SHUFFLE' | 'LOCK'): void {
+    switch (type) {
+ 
+        // BLIND — escurece a tela por 5 segundos
+        case 'BLIND': {
+            const overlay = this.add.rectangle(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY,
+                this.cameras.main.width,
+                this.cameras.main.height,
+                0x000000,
+                0.85
+            );
+            overlay.setScrollFactor(0);
+            overlay.setDepth(500);
+ 
+            const label = this.add.text(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY,
+                '👁 OFUSCADO!',
+                {
+                    fontSize: '18px',
+                    color: '#c94a4a',
+                    fontFamily: 'Courier New',
+                    backgroundColor: '#00000099',
+                    padding: { x: 12, y: 8 },
+                }
+            );
+            label.setOrigin(0.5);
+            label.setScrollFactor(0);
+            label.setDepth(501);
+ 
+            this.time.delayedCall(5000, () => {
+                overlay.destroy();
+                label.destroy();
+            });
+            break;
+        }
+ 
+        // SHUFFLE — embaralha as peças já colocadas no mapa
+        case 'SHUFFLE': {
+            const placements = this.placementManager.getAll();
+            if (placements.length < 2) break;
+ 
+            // Coleta as posições atuais
+            const positions = placements.map(p => ({ tileX: p.tileX, tileY: p.tileY }));
+ 
+            // Embaralha as posições (Fisher-Yates)
+            for (let i = positions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [positions[i], positions[j]] = [positions[j], positions[i]];
+            }
+ 
+            // Reseta o placementManager e recoloca as peças nas novas posições
+            // usando dispatchEvent para que o React atualize o progresso
+            this.placementManager.reset();
+            window.dispatchEvent(new CustomEvent('sudocidio:progressUpdate', {
+                detail: { correctCount: 0 }
+            }));
+ 
+            const label = this.add.text(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY - 60,
+                '🔀 EMBARALHADO!',
+                {
+                    fontSize: '16px',
+                    color: '#d4874d',
+                    fontFamily: 'Courier New',
+                    backgroundColor: '#00000099',
+                    padding: { x: 12, y: 8 },
+                }
+            );
+            label.setOrigin(0.5);
+            label.setScrollFactor(0);
+            label.setDepth(501);
+            this.tweens.add({
+                targets: label,
+                alpha: 0,
+                y: label.y - 40,
+                duration: 2500,
+                onComplete: () => label.destroy(),
+            });
+            break;
+        }
+ 
+        // LOCK — trava o drag & drop por 5 segundos
+        case 'LOCK': {
+            // Desativa input do Phaser
+            this.input.enabled = false;
+ 
+            const overlay = this.add.rectangle(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY,
+                this.cameras.main.width,
+                this.cameras.main.height,
+                0x1a0f0a,
+                0.5
+            );
+            overlay.setScrollFactor(0);
+            overlay.setDepth(500);
+ 
+            const label = this.add.text(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY,
+                '🔒 TRAVADO! (5s)',
+                {
+                    fontSize: '18px',
+                    color: '#ffd700',
+                    fontFamily: 'Courier New',
+                    backgroundColor: '#00000099',
+                    padding: { x: 12, y: 8 },
+                }
+            );
+            label.setOrigin(0.5);
+            label.setScrollFactor(0);
+            label.setDepth(501);
+ 
+            // Contador regressivo
+            let remaining = 5;
+            const tick = this.time.addEvent({
+                delay: 1000,
+                repeat: 4,
+                callback: () => {
+                    remaining--;
+                    label.setText(`🔒 TRAVADO! (${remaining}s)`);
+                },
+            });
+ 
+            this.time.delayedCall(5000, () => {
+                this.input.enabled = true;
+                overlay.destroy();
+                label.destroy();
+                tick.destroy();
+            });
+            break;
+        }
+    }
+}
 }

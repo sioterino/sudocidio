@@ -6,7 +6,7 @@
     "dev": "tsx server.ts",
     "clean": "npx rimraf .next && tsx server.ts",
     "build": "next build",
-    "start": "NODE_ENV=production tsx server.ts",
+    "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {

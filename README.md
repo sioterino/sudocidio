@@ -6,23 +6,26 @@
 ![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Phaser](https://img.shields.io/badge/Phaser-20232A?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
-![rot.js](https://img.shields.io/badge/rot.js-20232A?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
+![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
 
 ## 📌 Sobre o Projeto
 
-**SUDOCÍDIO** é um puzzle estratégico que combina a restrição espacial do *Sudoku* com a dedução investigativa de jogos como *Clue* e *Murdle*. 
+**SUDOCÍDIO** é um puzzle estratégico que combina a restrição espacial do *Sudoku* com a dedução investigativa de jogos como *Clue* e *Murdle*.
 
-Dois jogadores competem simultaneamente em um tabuleiro gerado proceduralmente para descobrir: **Quem é o assassino, qual foi a arma e em qual cômodo ocorreu o crime.** O jogo exige raciocínio rápido, organização espacial e permite o uso de mecânicas de sabotagem (como bloqueios e pistas falsas) para atrapalhar o adversário em tempo real.
+Dois jogadores competem simultaneamente em um tabuleiro gerado proceduralmente para descobrir: **quem é o assassino, qual foi a arma e em qual cômodo ocorreu o crime.** O jogo exige raciocínio rápido, organização espacial e permite o uso de mecânicas de sabotagem (bloqueios, embaralhamentos e ofuscamento de tela) para atrapalhar o adversário em tempo real.
 
 O projeto foi desenvolvido como trabalho acadêmico (IFSC) e está integrado ao sistema de créditos e autenticação da Feira de Jogos.
 
+---
+
 ## 🏗️ Arquitetura
 
-Para garantir uma latência baixíssima no modo multijogador competitivo, o projeto utiliza uma arquitetura híbrida focada em performance:
-* **Frontend:** React via Next.js (App Router), gerenciamento de estado global com `Zustand` e mecânicas de *drag-and-drop* com `@dnd-kit/core`.
-* **Backend (Custom Server):** Um servidor Node.js injetado na raiz do Next.js. Ele gerencia o estado das partidas ativas diretamente na **memória RAM** (dispensando banco de dados relacional durante o *gameplay*) e processa o algoritmo de geração procedural de puzzles (matrizes com solução única).
-* **Comunicação de Baixa Latência:** WebTransport (HTTP/3 / QUIC) para broadcast de eventos em tempo real.
-* **Autenticação:** Integração OAuth 2.0 (via provedor da Feira de Jogos).
+O projeto utiliza uma arquitetura híbrida com dois servidores independentes:
+
+- **Frontend:** Next.js (App Router) com renderização client-side. O mapa é gerado e renderizado via **Phaser 3**, com geração procedural baseada em seed — garantindo que ambos os jogadores recebam o mesmo tabuleiro.
+- **Servidor WebSocket:** Node.js + **Socket.IO** dedicado ao matchmaking e comunicação em tempo real. Gerencia a fila de jogadores, cria salas, sincroniza a seed e transmite eventos (progresso, sabotagens, fim de jogo) entre os clientes.
+- **Comunicação:** WebSocket bidirecional de baixa latência. Todos os eventos de jogo (peça colocada, sabotagem enviada, acusação, desistência) passam pelo servidor, que os redistribui apenas para os jogadores da mesma sala.
+- **Geração Procedural:** A seed é gerada pelo servidor no momento em que os dois jogadores são emparelhados e enviada simultaneamente a ambos — garantindo mapas idênticos sem nenhuma sincronização extra.
 
 ---
 
@@ -30,37 +33,73 @@ Para garantir uma latência baixíssima no modo multijogador competitivo, o proj
 
 ### Pré-requisitos
 
-Antes de começar, você precisará ter instalado em sua máquina:
-* [Node.js](https://nodejs.org/en/) (Versão 18 ou superior)
-* Um gerenciador de pacotes (`npm`, `yarn` ou `pnpm`)
+- [Node.js](https://nodejs.org/en/) v18 ou superior
+- `npm`, `yarn` ou `pnpm`
 
 ### Instalação
 
-1. Clone o repositório para a sua máquina:
 ```bash
-git clone [https://github.com/sua-conta/sudocidio.git](https://github.com/sua-conta/sudocidio.git)
-```
-
-2. Acesse a pasta do projeto:
-```bash
+git clone https://github.com/sua-conta/sudocidio.git
 cd sudocidio
-```
-
-3. Instale as dependências:
-```bash
 npm install
 ```
 
-### Executando Localmente (Desenvolvimento)
+### Variáveis de Ambiente
 
-Como o projeto utiliza um *Custom Server* para segurar a partida na memória, o comando de desenvolvimento inicializa tanto o servidor Node quanto a compilação do Next.js simultaneamente.
+Crie um arquivo `.env.local` na raiz do projeto:
 
-Inicie a aplicação com o comando:
-```bash
-npm run dev
+```env
+NEXT_PUBLIC_WS_URL=http://localhost:3001
 ```
 
-A aplicação estará disponível em `http://localhost:3000`.
+Para jogar em rede local, substitua `localhost` pelo seu IP local (ex: `192.168.1.100`):
+
+```env
+NEXT_PUBLIC_WS_URL=http://192.168.1.100:3001
+```
+
+### Executando em Desenvolvimento
+
+O projeto requer dois processos rodando simultaneamente:
+
+```bash
+# Terminal 1 — Frontend Next.js
+npm run dev
+
+# Terminal 2 — Servidor WebSocket
+npx tsx watch server.ts
+```
+
+O frontend estará disponível em `http://localhost:3000`.  
+O servidor WebSocket escuta na porta `3001`.
+
+### Executando em Produção (recomendado para jogar em rede)
+
+```bash
+npm run build
+npm run start
+```
+
+---
+
+## 🎮 Como Jogar
+
+1. Acesse `http://localhost:3000/game` (ou o IP da máquina host na rede local)
+2. O jogo entra automaticamente na fila de matchmaking
+3. Quando dois jogadores estiverem na fila, a partida começa com o mesmo mapa para os dois
+4. Use as **dicas** para deduzir o assassino, a arma e o cômodo do crime
+5. Arraste as **peças** para as posições corretas no mapa
+6. Use **sabotagens** para dificultar a vida do adversário
+7. Faça a **acusação** antes do tempo acabar — ou antes do oponente!
+
+---
+
+## 🌐 Jogar em Rede Local
+
+1. Descubra seu IP local: `ipconfig` (Windows) ou `ip a` (Linux/Mac)
+2. Atualize o `.env.local` com seu IP
+3. Reinicie os servidores
+4. O segundo jogador acessa `http://SEU_IP:3000/game` no navegador
 
 ---
 
@@ -68,34 +107,35 @@ A aplicação estará disponível em `http://localhost:3000`.
 
 ```text
 sudocidio/
-├── server.ts               # Custom Server (Node.js) - O motor real-time na RAM
+├── server-ws.ts            # Servidor WebSocket (Socket.IO) — matchmaking e tempo real
+├── .env.local              # Variáveis de ambiente (não commitado)
 ├── src/
-│   ├── app/                # As rotas e páginas da sua aplicação
-│   │   ├── api/            # rotas do OAuth da Feira
-│   │   ├── jogo/           # page.tsx -> carrega o tabuleiro
-│   │   └── page.tsx        # Tela inicial do site
-│   │
-│   ├── components/         
-│   │   ├── ui/             
-│   │   └── game/           
-│   │       ├── Board.tsx        
-│   │       ├── Cell.tsx          
-│   │       ├── DraggablePiece.tsx
-│   │       ├── SkillPanel.tsx    
-│   │       └── AccusationForm.tsx
-│   │
-│   ├── lib/                # Geração Procedural e Validador Lógico
-│   ├── store/              # useGameStore.ts (Zustand)
-│   └── types/       
-└── public/                 # Assets estáticos
+│   ├── app/
+│   │   ├── game/           # page.tsx — tela principal de jogo
+│   │   └── page.tsx        # Tela inicial / menu
+│   ├── components/
+│   │   └── gameplay/       # TopBar, CluesPanel, PiecesPanel, SabotagePanel, etc.
+│   ├── contexts/
+│   │   └── WebSocketContext.tsx  # Conexão e eventos Socket.IO
+│   ├── hooks/
+│   │   └── useMultiplayer.ts     # Hook de matchmaking e ações multiplayer
+│   └── types/
+└── mapa/
+    └── src/
+        ├── scenes/
+        │   ├── game.scene.ts     # Cena principal do Phaser (lê seed do servidor)
+        │   └── preload.scene.ts
+        └── generators/
+            └── map.generator.ts  # Geração procedural por seed
 ```
 
 ---
 
 ## 👩‍💻 Equipe Desenvolvedora
 
-* **Júlia Manuela Turnes** 
-* **Sofia Alves Toreti**
+- **Júlia Manuela Turnes**
+- **Sofia Alves Toreti**
 
 ---
-*Projeto desenvolvido para apresentação acadêmica e demonstração na Feira de Jogos - 2026.*
+
+*Projeto desenvolvido para apresentação acadêmica e demonstração na Feira de Jogos — 2026.*

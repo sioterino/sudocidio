@@ -332,7 +332,6 @@ function GamePageInner() {
   );
 }
 
-// Provider envolve tudo aqui — sem precisar de layout.tsx separado
 export default function GamePage() {
   return (
     <WebSocketProvider>

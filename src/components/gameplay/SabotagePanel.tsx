@@ -27,7 +27,7 @@ const ACTIONS: SabotageAction[] = [
     id: "SHUFFLE",
     name: "SWAP",
     icon: <Shuffle className="w-3.5 h-3.5" />,
-    cooldownSeconds: 30,
+    cooldownSeconds: 3,
     description: "Embaralha as peças do oponente",
   },
   {

@@ -404,6 +404,25 @@ class PlacementManager {
         if (!real) return false;
         return real.tileX === tileX && real.tileY === tileY;
     }
+
+    public batchMovePlacements(moves: { entityName: string; tileX: number; tileY: number }[]): void {
+    // Passo 1: remove todas as chaves antigas
+    for (const { entityName } of moves) {
+        const placement = this.byName.get(entityName);
+        if (!placement) continue;
+        this.placements.delete(`${placement.tileX},${placement.tileY}`);
+    }
+
+    // Passo 2: escreve todas as chaves novas
+    for (const { entityName, tileX, tileY } of moves) {
+        const placement = this.byName.get(entityName);
+        if (!placement) continue;
+        placement.tileX = tileX;
+        placement.tileY = tileY;
+        this.placements.set(`${tileX},${tileY}`, placement);
+        this.byName.set(entityName, placement);
+    }
+}
 }
 
 export default PlacementManager;

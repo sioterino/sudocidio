@@ -31,6 +31,11 @@ export class GameScene extends Scene {
 
     private hintSets: EntityHintSet[] = [];
     private unplacedEntities: Set<string> = new Set();
+    private sabotageListener!: EventListener;
+    private hintListener!: EventListener;
+    private accusationListener!: EventListener;
+    private volumeListener!: EventListener;
+
 
     // Flag de lock — bloqueia drops HTML5 vindos do React também
     private boardLocked = false;
@@ -57,15 +62,32 @@ export class GameScene extends Scene {
         this.setupHoverInteraction();
         this.setupHints();
 
-        window.addEventListener('sudocidio:applySabotage', ((e: Event) => {
+        // ── Listeners do window — guardados para remoção no destroy ──────────
+        this.sabotageListener = ((e: Event) => {
             this.applySabotage((e as CustomEvent).detail.sabotageType);
-        }) as EventListener);
-        window.addEventListener('sudocidio:requestHint', () => this.giveNewHint());
-        window.addEventListener('sudocidio:makeAccusation', ((e: Event) => this.evaluateReactAccusation(e as CustomEvent)) as EventListener);
-        window.addEventListener('sudocidio:volumeChange', ((e: Event) => {
-            this.sound.volume = (e as CustomEvent).detail.volume;
-        }) as EventListener);
+        }) as EventListener;
 
+        this.hintListener = (() => this.giveNewHint()) as EventListener;
+
+        this.accusationListener = ((e: Event) => {
+            this.evaluateReactAccusation(e as CustomEvent);
+        }) as EventListener;
+
+        this.volumeListener = ((e: Event) => {
+            this.sound.volume = (e as CustomEvent).detail.volume;
+        }) as EventListener;
+
+        window.addEventListener('sudocidio:applySabotage', this.sabotageListener);
+        window.addEventListener('sudocidio:requestHint', this.hintListener);
+        window.addEventListener('sudocidio:makeAccusation', this.accusationListener);
+        window.addEventListener('sudocidio:volumeChange', this.volumeListener);
+
+        this.events.on('destroy', () => {
+            window.removeEventListener('sudocidio:applySabotage', this.sabotageListener);
+            window.removeEventListener('sudocidio:requestHint', this.hintListener);
+            window.removeEventListener('sudocidio:makeAccusation', this.accusationListener);
+            window.removeEventListener('sudocidio:volumeChange', this.volumeListener);
+        });
         console.log(`[GameScene] Seed usada: ${this.mapData.seed} (fonte: ${seedFromReact ? 'multiplayer' : seedFromUrl ? 'url' : 'aleatória'})`);
 
         if (this.mapData.entities) {
@@ -515,97 +537,79 @@ export class GameScene extends Scene {
             // ── SHUFFLE — sprites voam animados até as novas posições ──────────
             case 'SHUFFLE': {
                 const placements = this.placementManager.getAll();
+                console.log('SHUFFLE - placements:', placements.length, placements.map(p => `${p.entityName}@${p.tileX},${p.tileY}`));
+                const valid = placements.filter(p => this.isWithinMapBounds(p.tileX, p.tileY));
+                console.log('SHUFFLE - valid:', valid.length);
+                if (valid.length < 2) { console.log('SHUFFLE - abortou, válidos < 2'); break; }
 
-                // Filtra apenas peças dentro dos limites válidos do mapa
-                const valid = placements.filter(p =>
-                    this.isWithinMapBounds(p.tileX, p.tileY)
-                );
-                if (valid.length < 2) break;
-
-                // Snapshot das posições de destino
                 const positions = valid.map(p => ({ tileX: p.tileX, tileY: p.tileY }));
-
-                // Fisher-Yates sobre as posições válidas
                 for (let i = positions.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [positions[i], positions[j]] = [positions[j], positions[i]];
                 }
 
-                const ANIM_DURATION = 420; // ms de voo por sprite
+                const ANIM_DURATION = 420;
+                let settled = 0;
 
                 valid.forEach((placement, i) => {
                     const dest = positions[i];
-
-                    // Calcula pixel de destino usando o helper do placementManager
                     const destPixel = this.placementManager.tileToPixelPublic(dest.tileX, dest.tileY);
 
-                    // Só anima se realmente vai mudar de posição
-                    if (dest.tileX === placement.tileX && dest.tileY === placement.tileY) return;
+                    if (dest.tileX === placement.tileX && dest.tileY === placement.tileY) {
+                        settled++;
+                        return;
+                    }
 
-                    // Sobe levemente (arc) e voa até o destino
                     const midX = (placement.sprite.x + destPixel.x) / 2;
                     const midY = Math.min(placement.sprite.y, destPixel.y) - 18;
 
-                    // Tween de saída: sobe para o arco
                     this.tweens.add({
                         targets: placement.sprite,
-                        x: midX,
-                        y: midY,
+                        x: midX, y: midY,
                         scaleX: placement.sprite.scaleX * 1.25,
                         scaleY: placement.sprite.scaleY * 1.25,
-                        alpha: 0.75,
-                        depth: 150,
+                        alpha: 0.75, depth: 150,
                         duration: ANIM_DURATION * 0.45,
                         ease: 'Quad.Out',
                         onComplete: () => {
-                            // Tween de chegada: desce até o destino
                             this.tweens.add({
                                 targets: placement.sprite,
-                                x: destPixel.x,
-                                y: destPixel.y,
+                                x: destPixel.x, y: destPixel.y,
                                 scaleX: placement.sprite.scaleX / 1.25,
                                 scaleY: placement.sprite.scaleY / 1.25,
-                                alpha: 1,
-                                depth: 50,
+                                alpha: 1, depth: 50,
                                 duration: ANIM_DURATION * 0.55,
                                 ease: 'Bounce.Out',
                                 onComplete: () => {
-                                    // Atualiza dados internos do placementManager
-                                    // após a animação terminar
-                                    this.placementManager.movePlacementDataOnly(
-                                        placement.entityName,
-                                        dest.tileX,
-                                        dest.tileY
-                                    );
-                                    // Recalcula tints/progresso quando o último sprite pousar
-                                    this.checkPlacements(this.placementManager.getAll());
+                                    settled++;
+                                    if (settled === valid.length) {
+                                        // ✅ Batch atômico: primeiro limpa TUDO, depois reescreve TUDO
+                                        this.placementManager.batchMovePlacements(
+                                            valid.map((p, idx) => ({
+                                                entityName: p.entityName,
+                                                tileX: positions[idx].tileX,
+                                                tileY: positions[idx].tileY,
+                                            }))
+                                        );
+                                        this.checkPlacements(this.placementManager.getAll());
+                                    }
                                 },
                             });
                         },
                     });
                 });
 
-                // Label discreto aparece junto com o início das animações
                 const label = this.add.text(
                     this.cameras.main.centerX,
                     this.cameras.main.centerY - 55,
                     'SWAP',
-                    {
-                        fontSize: '11px',
-                        color: '#d4874d',
-                        fontFamily: '"Courier New", monospace',
-                        fontStyle: 'bold',
-                        letterSpacing: 8,
-                    }
+                    { fontSize: '11px', color: '#d4874d', fontFamily: '"Courier New", monospace', fontStyle: 'bold', letterSpacing: 8 }
                 );
                 label.setOrigin(0.5).setScrollFactor(0).setDepth(501).setAlpha(0);
                 this.tweens.add({ targets: label, alpha: 1, duration: 120 });
                 this.tweens.add({
-                    targets: label,
-                    alpha: 0,
-                    y: label.y - 20,
-                    duration: 400,
-                    delay: ANIM_DURATION + 100,
+                    targets: label, alpha: 0, y: label.y - 20,
+                    duration: 400, delay: ANIM_DURATION + 100,
                     onComplete: () => label.destroy(),
                 });
                 break;

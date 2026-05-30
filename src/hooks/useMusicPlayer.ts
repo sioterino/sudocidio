@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const TRACKS = [
-  "/audio/music/track_1.mp3", // From The New World - Dvorak
-  "/audio/music/track_2.mp3", // Lacrimosa - Mozart
-  "/audio/music/track_3.mp3", // Dies Irae - Verdi
-  "/audio/music/track_4.mp3", // Dance of The Knights - Prokofiev
-  "/audio/music/track_5.mp3", // Valse Sentimentale - Tchaikovsky
-  "/audio/music/track_6.mp3", // Danse Macabre - Saint Saens
+  "/audio/music/track_1.mp3",
+  "/audio/music/track_2.mp3",
+  "/audio/music/track_3.mp3",
+  "/audio/music/track_4.mp3",
+  "/audio/music/track_5.mp3",
+  "/audio/music/track_6.mp3",
 ];
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -30,7 +30,15 @@ export function useMusicPlayer() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Initialize the queue with shuffled tracks
+  // Refs para ter sempre o valor atual dentro de callbacks
+  const volumeRef = useRef(0.5);
+  const isMutedRef = useRef(false);
+
+  const applyVolume = useCallback(() => {
+    if (!audioRef.current) return;
+    audioRef.current.volume = isMutedRef.current ? 0 : volumeRef.current;
+  }, []);
+
   const initializeQueue = useCallback(() => {
     const shuffledTracks = shuffleArray(TRACKS);
     setQueue(shuffledTracks);
@@ -38,114 +46,82 @@ export function useMusicPlayer() {
     return shuffledTracks;
   }, []);
 
-  // Play the next track in the queue
   const playNext = useCallback(() => {
     setQueue((prevQueue) => {
       if (prevQueue.length === 0) return prevQueue;
-
       const [nextTrack, ...remainingQueue] = prevQueue;
-      // Add the track back to the end of the queue
       const newQueue = [...remainingQueue, nextTrack];
-
       setCurrentTrack(nextTrack);
       setHasError(false);
-
       if (audioRef.current) {
         audioRef.current.src = nextTrack;
-        audioRef.current.play().catch(() => {
-          // Silently handle autoplay restrictions
-          setIsPlaying(false);
-        });
+        applyVolume();
+        audioRef.current.play().catch(() => setIsPlaying(false));
       }
-
       return newQueue;
     });
-  }, []);
+  }, [applyVolume]);
 
-  // Start playing music
   const play = useCallback(() => {
     if (!isInitialized) {
       const shuffledTracks = initializeQueue();
       const [firstTrack, ...remainingQueue] = shuffledTracks;
-      const newQueue = [...remainingQueue, firstTrack];
-      setQueue(newQueue);
+      setQueue([...remainingQueue, firstTrack]);
       setCurrentTrack(firstTrack);
       setHasError(false);
-
       if (audioRef.current) {
         audioRef.current.src = firstTrack;
-        audioRef.current.play().catch(() => {
-          setIsPlaying(false);
-        });
+        applyVolume();
+        audioRef.current.play().catch(() => setIsPlaying(false));
       }
     } else if (audioRef.current) {
-      audioRef.current.play().catch(() => {
-        setIsPlaying(false);
-      });
+      applyVolume();
+      audioRef.current.play().catch(() => setIsPlaying(false));
     }
     setIsPlaying(true);
-  }, [isInitialized, initializeQueue]);
+  }, [isInitialized, initializeQueue, applyVolume]);
 
-  // Pause music
   const pause = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    audioRef.current?.pause();
     setIsPlaying(false);
   }, []);
 
-  // Toggle play/pause
   const toggle = useCallback(() => {
-    if (isPlaying) {
-      pause();
-    } else {
-      play();
-    }
+    if (isPlaying) pause();
+    else play();
   }, [isPlaying, play, pause]);
 
-  // Skip to next track
-  const skip = useCallback(() => {
-    playNext();
-  }, [playNext]);
+  const skip = useCallback(() => playNext(), [playNext]);
 
-  // Set volume (0-1)
   const changeVolume = useCallback((newVolume: number) => {
-    const clampedVolume = Math.max(0, Math.min(1, newVolume));
-    setVolume(clampedVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = clampedVolume;
+    const clamped = Math.max(0, Math.min(1, newVolume));
+    volumeRef.current = clamped;
+    setVolume(clamped);
+    // Se estava mudo e mudou o volume, desmuta
+    if (isMutedRef.current && clamped > 0) {
+      isMutedRef.current = false;
+      setIsMuted(false);
     }
-  }, []);
+    applyVolume();
+  }, [applyVolume]);
 
-  // Toggle mute
   const toggleMute = useCallback(() => {
-    setIsMuted((prev) => {
-      const newMuted = !prev;
-      if (audioRef.current) {
-        audioRef.current.muted = newMuted;
-      }
-      return newMuted;
-    });
-  }, []);
+    const newMuted = !isMutedRef.current;
+    isMutedRef.current = newMuted;
+    setIsMuted(newMuted);
+    applyVolume();
+  }, [applyVolume]);
 
-  // Initialize audio element
   useEffect(() => {
     if (typeof window !== "undefined" && !audioRef.current) {
       audioRef.current = new Audio();
-      audioRef.current.volume = volume;
-      audioRef.current.muted = isMuted;
+      applyVolume();
 
-      // When a track ends, play the next one
       audioRef.current.addEventListener("ended", playNext);
-
-      // Handle play state changes
       audioRef.current.addEventListener("play", () => setIsPlaying(true));
       audioRef.current.addEventListener("pause", () => setIsPlaying(false));
-      
-      // Handle errors (e.g., file not found)
       audioRef.current.addEventListener("error", () => {
         setHasError(true);
-        // Try to play the next track after a short delay
         setTimeout(playNext, 500);
       });
     }
@@ -157,34 +133,13 @@ export function useMusicPlayer() {
         audioRef.current = null;
       }
     };
-  }, [playNext, volume, isMuted]);
-
-  // Update volume when it changes
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  // Update muted state
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = isMuted;
-    }
-  }, [isMuted]);
+  }, [playNext, applyVolume]);
 
   return {
-    play,
-    pause,
-    toggle,
-    skip,
-    changeVolume,
-    toggleMute,
-    isPlaying,
-    currentTrack,
-    volume,
-    isMuted,
-    queue,
-    hasError,
+    play, pause, toggle, skip,
+    changeVolume, toggleMute,
+    isPlaying, currentTrack,
+    volume, isMuted,
+    queue, hasError,
   };
 }

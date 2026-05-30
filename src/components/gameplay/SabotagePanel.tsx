@@ -20,14 +20,14 @@ const ACTIONS: SabotageAction[] = [
     id: "BLIND",
     name: "OFUSCAR",
     icon: <EyeOff className="w-3.5 h-3.5" />,
-    cooldownSeconds: 20,
+    cooldownSeconds: 25,
     description: "Escurece a tela do oponente por 5s",
   },
   {
     id: "SHUFFLE",
     name: "SWAP",
     icon: <Shuffle className="w-3.5 h-3.5" />,
-    cooldownSeconds: 3,
+    cooldownSeconds: 30,
     description: "Embaralha as peças do oponente",
   },
   {
@@ -41,7 +41,7 @@ const ACTIONS: SabotageAction[] = [
     id: "LOCK",
     name: "LOCK",
     icon: <Lock className="w-3.5 h-3.5" />,
-    cooldownSeconds: 25,
+    cooldownSeconds: 30,
     description: "Trava o drag & drop do oponente por 5s",
   },
 ];

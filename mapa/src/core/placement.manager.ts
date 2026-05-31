@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // core/placement.manager.ts
 import type { Scene } from 'phaser';
 import type { GameEntities, PlacedEntity, Suspect, Victim, Weapon } from '../types/npc.registry';
@@ -68,12 +69,11 @@ class PlacementManager {
 
         if (!this.isValidPlacement(tile.tileX, tile.tileY, payload.entityType)) return false;
 
-        // Remove any existing placement at that tile
-        this.removePlacementAtTile(tile.tileX, tile.tileY);
+        const existing = this.placements.get(`${tile.tileX},${tile.tileY}`);
+        if (existing && existing.entityName !== payload.entityId) return false;
 
         // Remove prior placement of this entity (it might have been on the map already)
         this.removePlacementByName(payload.entityId);
-
         this.createPlacement(entity, payload.entityType, tile.tileX, tile.tileY);
         return true;
     }
@@ -134,6 +134,12 @@ class PlacementManager {
 
             // Dropped on same tile — no-op
             if (tile.tileX === target.tileX && tile.tileY === target.tileY) {
+                target.sprite.setAlpha(1);
+                return;
+            }
+
+            const destExisting = this.placements.get(`${tile.tileX},${tile.tileY}`);
+            if (destExisting && destExisting.entityName !== target.entityName) {
                 target.sprite.setAlpha(1);
                 return;
             }

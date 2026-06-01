@@ -265,6 +265,8 @@ export class GameScene extends Scene {
             this.mapData.rooms
         );
 
+        console.log(this.hintSets)
+        
         this.hintSets.forEach(hintSet => {
             const hintText = hintSet.initialHints && hintSet.initialHints.length > 0
                 ? hintSet.initialHints[0].text

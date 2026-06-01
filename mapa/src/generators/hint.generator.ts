@@ -6,9 +6,13 @@
  *   medium = room-level info       (same room as X, alone/not alone)
  *   hard   = negative/vague info   (not in bathroom, X rooms are empty)
  *
- * Every entity (suspect AND weapon) receives two initial hints —
- * one medium and one easy — so the opening state is solvable without
- * having to grind "nova dica!".
+ * Initial hints follow a fixed global distribution so the puzzle is always
+ * solvable from the opening state without grinding "nova dica!":
+ *   60 % easy  |  30 % medium  |  10 % hard
+ *
+ * Every entity (suspect AND weapon) receives one initial hint chosen from
+ * its level bucket at random.  On-demand "nova dica!" hints are unconstrained
+ * and weighted 40/40/20 (easy/medium/hard) for useful progressive disclosure.
  *
  * @author System Architect
  */
@@ -34,7 +38,7 @@ export interface Hint {
 
 export interface EntityHintSet {
     entity: PlacedEntity;
-    /** Two hints shown immediately at game start (one medium + one easy) */
+    /** One hint shown at game start; level follows the 60/30/10 pool distribution */
     initialHints: Hint[];
     /** Remaining hints revealed on demand, ordered easy → medium → hard */
     furtherHints: Hint[];
@@ -47,14 +51,17 @@ class HintGenerator {
     // ── Public API ─────────────────────────────────────────────────────────
 
     /**
-     * Builds the initial hint sets shown when the game starts.
+     * Builds the initial hint set shown when the game starts.
      *
-     * Every suspect AND weapon gets exactly two initial hints:
-     *   • one at 'medium' level  (room-level info)
-     *   • one at 'easy'  level   (precise spatial info)
+     * Each entity (suspect or weapon) receives **exactly one** initial hint.
+     * Across the full set the hint levels are distributed as:
+     *   • 60 % easy   — precise spatial clues (adjacent furniture, direction)
+     *   • 30 % medium — room-level clues      (alone/not-alone, on furniture)
+     *   • 10 % hard   — vague/negative clues  (not in room X, empty rooms)
      *
-     * This gives the player enough information to make a meaningful first
-     * attempt without having to request additional hints.
+     * The assignment is randomised per entity so the same entity doesn't always
+     * get the same difficulty tier, and the distribution is guaranteed globally
+     * (not just on average) so the puzzle is consistently solvable from the start.
      *
      * @param entities  Full GameEntities output from EntityGenerator
      * @param furniture Full PlacedFurniture array from FurnitureGenerator
@@ -70,27 +77,59 @@ class HintGenerator {
             ...entities.weapons.map(e => ({ entity: e, type: 'weapon' as const })),
         ];
 
-        return allEntities.map(({ entity, type }) => {
+        const total = allEntities.length;
+
+        // ── Quota: 60% easy, 30% medium, 10% hard ─────────────────────────────
+        // Each entity gets exactly ONE initial hint. Distribute the levels so that
+        // across the full set: ~60% are easy, ~30% medium, ~10% hard.
+        // We assign quotas by rounding, then correct any remainder so sum === total.
+        let easyQuota  = Math.round(total * 0.60);
+        let mediumQuota = Math.round(total * 0.30);
+        let hardQuota  = total - easyQuota - mediumQuota; // absorbs rounding
+
+        // Guard: never negative (can happen with very small totals)
+        if (hardQuota < 0) { mediumQuota += hardQuota; hardQuota = 0; }
+        if (mediumQuota < 0) { easyQuota += mediumQuota; mediumQuota = 0; }
+
+        // Build a shuffled level assignment list
+        const levelPool: HintLevel[] = [
+            ...Array(easyQuota).fill('easy'),
+            ...Array(mediumQuota).fill('medium'),
+            ...Array(hardQuota).fill('hard'),
+        ];
+        const shuffledLevels = Random.shuffle(levelPool) as HintLevel[];
+
+        // ── Assign one initial hint per entity ─────────────────────────────────
+        return allEntities.map(({ entity, type }, index) => {
             const ladder = this.buildLadder(entity, type, entities, furniture, rooms);
 
-            // Pick one medium and one easy hint for the initial reveal.
-            // Fall back gracefully if a level is unavailable.
-            const mediumHint =
-                ladder.find(h => h.level === 'medium') ??
-                ladder.find(h => h.level === 'hard') ??
-                ladder[ladder.length - 1];
+            const targetLevel = shuffledLevels[index];
 
-            const easyHint =
-                ladder.find(h => h.level === 'easy' && h !== mediumHint) ??
-                ladder.find(h => h !== mediumHint) ??
-                ladder[0];
+            // Pick a random hint at the target level; fall back to adjacent levels
+            // so we never leave an entity with no initial hint.
+            const atTarget  = Random.shuffle(ladder.filter(h => h.level === targetLevel));
+            const atEasy    = Random.shuffle(ladder.filter(h => h.level === 'easy'));
+            const atMedium  = Random.shuffle(ladder.filter(h => h.level === 'medium'));
+            const atHard    = Random.shuffle(ladder.filter(h => h.level === 'hard'));
 
-            const initialHints = [mediumHint, easyHint].filter(
-                (h, i, arr) => h !== undefined && arr.indexOf(h) === i
-            ) as Hint[];
+            // Fallback chain per level
+            const fallbackOrder: HintLevel[] =
+                targetLevel === 'easy'   ? ['easy',   'medium', 'hard']  :
+                targetLevel === 'medium' ? ['medium', 'easy',   'hard']  :
+                                           ['hard',   'medium', 'easy'];
 
-            const initialSet = new Set(initialHints);
-            const furtherHints = ladder.filter(h => !initialSet.has(h));
+            const byLevel: Record<HintLevel, Hint[]> = { easy: atEasy, medium: atMedium, hard: atHard };
+
+            let initialHint: Hint | undefined;
+            for (const lvl of fallbackOrder) {
+                if (byLevel[lvl].length > 0) { initialHint = byLevel[lvl][0]; break; }
+            }
+            // Absolute last resort — shouldn't be reachable
+            if (!initialHint) initialHint = ladder[0];
+
+            const initialHints  = [initialHint];
+            const initialSet    = new Set(initialHints);
+            const furtherHints  = ladder.filter(h => !initialSet.has(h));
 
             return { entity, initialHints, furtherHints };
         });

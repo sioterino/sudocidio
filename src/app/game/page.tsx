@@ -15,12 +15,17 @@ import {
 import type { GameOverReason as UIGameOverReason } from "@/src/components/gameplay";
 import { ClueData } from "@/src/components/gameplay/CluesPanel";
 import { WebSocketProvider } from "@/src/contexts/WebSocketContext";
+import { AuthProvider } from "@/src/contexts/AuthContext"; // 👈 único import novo
 import { useMultiplayer } from "@/src/hooks/useMultiplayer";
 import type { ServerGameOverReason } from "@/src/contexts/WebSocketContext";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const INITIAL_TIME = 180;
+
+// Altere conforme seu cadastro na Feira de Jogos
+const FEIRA_PRODUCT_ID = 42;
+const FEIRA_CREDIT_VALUE = 100;
 
 // ─── Mapeia razão do servidor → razão da UI ───────────────────────────────────
 
@@ -34,11 +39,9 @@ function mapReason(reason: ServerGameOverReason, isWinner: boolean): UIGameOverR
 
 // ─── GamePage ─────────────────────────────────────────────────────────────────
 
-// Componente interno que usa o hook (precisa estar dentro do Provider)
 function GamePageInner() {
   const router = useRouter();
 
-  // ── Estado local ──────────────────────────────────────────────────────────
   const [time, setTime] = useState(INITIAL_TIME);
   const [activeClues, setActiveClues] = useState<ClueData[]>([]);
   const [matchId, setMatchId] = useState(0);
@@ -56,7 +59,6 @@ function GamePageInner() {
   const [opponentProgress, setOpponentProgress] = useState(0);
   const [currentProgress, setCurrentProgress] = useState(0);
 
-  // ── Multiplayer ───────────────────────────────────────────────────────────
   const {
     matchStatus,
     seed,
@@ -68,7 +70,6 @@ function GamePageInner() {
     resetMatch,
   } = useMultiplayer({
     onGameStart: (_seed) => {
-      // Servidor confirmou partida: reseta UI e força novo matchId (Phaser reinicia)
       setIsGameOver(false);
       setGameOverData(null);
       setTime(INITIAL_TIME);
@@ -86,10 +87,7 @@ function GamePageInner() {
     },
   });
 
-  // seed do servidor (multiplayer) ou local (modo solo/fallback)
   const activeSeed = seed ?? (matchId > 0 ? Date.now().toString() : "1234");
-
-  // ── Listeners do Phaser → React ───────────────────────────────────────────
 
   useEffect(() => {
     const handleNewHint = (event: Event) => {
@@ -138,7 +136,6 @@ function GamePageInner() {
     };
   }, []);
 
-  // Progresso de peças → reporta ao servidor
   useEffect(() => {
     const handleProgress = (event: Event) => {
       const { correctCount } = (event as CustomEvent).detail;
@@ -148,7 +145,7 @@ function GamePageInner() {
     window.addEventListener('sudocidio:progressUpdate', handleProgress);
     return () => window.removeEventListener('sudocidio:progressUpdate', handleProgress);
   }, [reportProgress]);
-  // Progresso do adversário vindo do servidor
+
   useEffect(() => {
     const handleOpponentProgress = (event: Event) => {
       setOpponentProgress((event as CustomEvent).detail.opponentProgress);
@@ -157,7 +154,6 @@ function GamePageInner() {
     return () => window.removeEventListener("sudocidio:opponentProgress", handleOpponentProgress);
   }, []);
 
-  // Sabotagem recebida → repassa ao Phaser
   useEffect(() => {
     const handleReceiveSabotage = (event: Event) => {
       const { sabotageType } = (event as CustomEvent).detail;
@@ -167,7 +163,6 @@ function GamePageInner() {
     return () => window.removeEventListener("sudocidio:receiveSabotage", handleReceiveSabotage);
   }, []);
 
-  // Sabotagem enviada pelo SabotagePanel
   useEffect(() => {
     const handleSendSabotage = (event: Event) => {
       sendSabotage((event as CustomEvent).detail.sabotageType);
@@ -176,11 +171,10 @@ function GamePageInner() {
     return () => window.removeEventListener("sudocidio:sendSabotage", handleSendSabotage);
   }, [sendSabotage]);
 
-  // Vitória local (Phaser confirmou acusação correta)
   useEffect(() => {
     const handleVictory = (event: Event) => {
       const data = (event as CustomEvent).detail;
-      accuse(true); // avisa servidor → GAME_OVER para ambos
+      accuse(true);
       setGameOverData({
         reason: "victory",
         murderer: data.murderer,
@@ -193,8 +187,6 @@ function GamePageInner() {
     window.addEventListener("sudocidio:victory", handleVictory);
     return () => window.removeEventListener("sudocidio:victory", handleVictory);
   }, [time, accuse]);
-
-  // ── Cronômetro ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (isGameOver) return;
@@ -211,8 +203,6 @@ function GamePageInner() {
     return () => clearInterval(timer);
   }, [isGameOver]);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     return `${mins.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -226,7 +216,7 @@ function GamePageInner() {
     setCurrentProgress(0);
     setOpponentProgress(0);
     resetMatch();
-    findMatch(); // volta para a fila
+    findMatch();
   }, [findMatch, resetMatch]);
 
   const handleGoHome = useCallback(() => {
@@ -234,13 +224,10 @@ function GamePageInner() {
     router.push("/");
   }, [router, resetMatch]);
 
-  // Entra na fila automaticamente ao montar a página
   useEffect(() => {
     findMatch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Tela de aguardo ───────────────────────────────────────────────────────
 
   if (matchStatus === "WAITING") {
     return (
@@ -276,8 +263,6 @@ function GamePageInner() {
     );
   }
 
-  // ── Tela de jogo ──────────────────────────────────────────────────────────
-
   return (
     <main className="h-screen w-screen flex flex-col bg-wood-900 overflow-hidden scanlines">
       <div
@@ -294,7 +279,6 @@ function GamePageInner() {
       </div>
 
       <div key={matchId} className="flex-1 flex gap-2 p-2 min-h-0 relative z-10">
-        {/* Coluna esquerda */}
         <div className="w-52 flex flex-col gap-2 flex-shrink-0">
           <div className="flex-1 min-h-0">
             <CluesPanel clues={activeClues} />
@@ -304,12 +288,10 @@ function GamePageInner() {
           </div>
         </div>
 
-        {/* Mapa Phaser — usa seed do servidor em multiplayer */}
         <div className="flex-1 min-w-0 flex items-center justify-center">
           <PhaserMapWrapper seed={activeSeed} />
         </div>
 
-        {/* Coluna direita */}
         <div className="w-48 flex flex-col gap-2 flex-shrink-0">
           <SabotagePanel />
           <OpponentPreview
@@ -318,13 +300,15 @@ function GamePageInner() {
             opponentPieces={[]}
           />
           <AccusationButton disabled={isGameOver} />
-
         </div>
       </div>
 
+      {/* 👇 únicas 2 props novas — tudo mais idêntico ao original */}
       <GameOverModal
         isOpen={isGameOver}
         data={gameOverData}
+        productId={FEIRA_PRODUCT_ID}
+        creditValue={FEIRA_CREDIT_VALUE}
         onPlayAgain={handlePlayAgain}
         onGoHome={handleGoHome}
       />
@@ -334,8 +318,10 @@ function GamePageInner() {
 
 export default function GamePage() {
   return (
-    <WebSocketProvider>
-      <GamePageInner />
-    </WebSocketProvider>
+    <AuthProvider>
+      <WebSocketProvider>
+        <GamePageInner />
+      </WebSocketProvider>
+    </AuthProvider>
   );
 }

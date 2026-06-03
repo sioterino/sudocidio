@@ -166,7 +166,8 @@ npx web-push generate-vapid-keys
 npm run dev
 ```
 
-> **Atenção:** `npm run dev` executa `tsx server.ts`, não `next dev`.
+> [!IMPORTANT]
+> `npm run dev` executa `tsx server.ts`, não `next dev`.
 
 Acesse: `http://localhost:3000`
 
@@ -206,7 +207,8 @@ npx tsx server.ts
 
 Acesse: `http://localhost:3001`
 
-> Em produção, configure `NEXT_PUBLIC_WS_URL` com o endereço público do servidor Socket.IO antes de rodar o build.
+> [!NOTE]
+>  Em produção, configure `NEXT_PUBLIC_WS_URL` com o endereço público do servidor Socket.IO antes de rodar o build.
 
 ---
 

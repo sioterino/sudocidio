@@ -1,94 +1,249 @@
-# Phaser 3 with TypeScript and Webpack
+# Sudocidio Map Package
 
-A simple game with Phaser, TypeScript and Webpack playable here: https://mizar999.github.io/phaser-typescript-webpack/
+`mapa/` contains the Phaser map and puzzle engine for Sudocidio.
 
-## Resources
+It has two roles:
 
-- [How to build a simple game in the browser with Phaser 3 and TypeScript](https://medium.freecodecamp.org/how-to-build-a-simple-game-in-the-browser-with-phaser-3-and-typescript-bdc94719135) by Mariya Davydova [@mariyadavydova](https://www.freecodecamp.org/news/author/mariya/)
+- Standalone Phaser/Webpack app for developing the map in isolation.
+- Source package imported directly by the root Next.js app through `src/components/gameplay/PhaserMapWrapper.tsx`.
 
-## Assets
+The main Sudocidio app does not need a separate `mapa` server running during normal gameplay. Next imports `mapa/src/scenes/preload.scene.ts` and `mapa/src/scenes/game.scene.ts` directly and creates the Phaser game inside the `/game` page.
 
-- [Simple Space](https://www.kenney.nl/assets/simple-space) by [Kenney](https://www.kenney.nl/)
+## What It Does
 
-## Development
+The map package owns the procedural mansion and the Phaser gameplay layer:
 
-If you want to develop the project further, the following commands should be sufficient:
+- Loads all map, room, NPC, weapon, furniture, cursor, and highlight textures.
+- Builds runtime tilesets.
+- Generates deterministic maps from a seed.
+- Creates room layouts and merges grid cells into larger rooms.
+- Assigns room types.
+- Places suspects, victim, weapons, and furniture.
+- Generates clue/hint text.
+- Renders tilemaps, furniture, highlights, and placed entities.
+- Handles drag/drop placement onto the Phaser canvas.
+- Checks correct placements and accusation results.
+- Applies sabotage effects received from the React/Socket.IO layer.
+- Sends progress, hint, entity, and result events back to React through browser custom events.
 
-```powershell
-git clone https://github.com/Mizar999/phaser-typescript-webpack.git
+## Project Structure
+
+```text
+mapa/
+|-- README.md
+|-- package.json
+|-- package-lock.json
+|-- webpack.config.js
+|-- tsconfig.json
+|-- index.html                  # Standalone HTML host
+|-- style.css                   # Standalone styles
+|-- assets/                     # Source art used by the standalone package
+`-- src/
+    |-- app.ts                  # Standalone Phaser entry point
+    |-- scenes/
+    |   |-- preload.scene.ts    # Loads textures and builds tilesets
+    |   `-- game.scene.ts       # Main Phaser scene and gameplay bridge
+    |-- generators/
+    |   |-- map.generator.ts    # Main procedural map orchestrator
+    |   |-- layout.generator.ts
+    |   |-- tilemap.builder.ts
+    |   |-- entity.generator.ts
+    |   |-- furniture.generator.ts
+    |   |-- hint.generator.ts
+    |   `-- utils/
+    |       |-- room.assigner.ts
+    |       `-- room.merger.ts
+    |-- core/
+    |   |-- random.core.ts
+    |   |-- camera.controller.ts
+    |   |-- texture.loader.ts
+    |   |-- tileset.builder.ts
+    |   |-- placement.manager.ts
+    |   `-- furniture.manager.ts
+    |-- components/
+    |   |-- tilemap.renderer.ts
+    |   `-- highlight.manager.ts
+    |-- ui/
+    |   |-- HUD.component.ts
+    |   |-- HUD.styles.ts
+    |   |-- entity.panel.ts
+    |   `-- guess.panel.ts
+    |-- types/
+    |   |-- interfaces.ts
+    |   |-- npc.registry.ts
+    |   `-- furniture.registry.ts
+    `-- utils/
+        |-- coordinates.utils.ts
+        |-- DOM.utils.ts
+        `-- highlightTexture.utils.ts
+```
+
+## Important Dependencies
+
+From `mapa/package.json`:
+
+Runtime dependencies:
+
+- `rot-js`: procedural/random generation support.
+- `qs`: query-string parsing support.
+
+Development/build dependencies:
+
+- `phaser`: Phaser 3 runtime for the standalone map.
+- `typescript`: TypeScript compiler.
+- `webpack`, `webpack-cli`: standalone bundle pipeline.
+- `ts-loader`: TypeScript loader for Webpack.
+- `http-server`: serves the standalone build.
+- `concurrently`: helper for running watch/server commands together manually.
+
+Note: the root app also has its own `phaser` dependency. In normal gameplay, `PhaserMapWrapper` imports Phaser from the root app and imports scene source files from `mapa/src`.
+
+## How It Fits Into the Main App
+
+The root game page renders:
+
+```text
+src/components/gameplay/PhaserMapWrapper.tsx
+```
+
+That component dynamically imports:
+
+```text
+mapa/src/scenes/preload.scene.ts
+mapa/src/scenes/game.scene.ts
+```
+
+Before creating the Phaser game, the wrapper stores the multiplayer seed on:
+
+```ts
+window.__sudocidio_seed
+```
+
+`GameScene` reads the seed in this order:
+
+1. `window.__sudocidio_seed`
+2. `?seed=` from the current URL
+3. random fallback
+
+Then it calls:
+
+```ts
+MapGenerator.generate(seed)
+```
+
+This is why both players receive identical maps after the Socket.IO server emits the same seed to both clients.
+
+React and Phaser communicate with browser custom events. Examples:
+
+Phaser to React:
+
+- `sudocidio:entitiesGenerated`
+- `sudocidio:newHint`
+- `sudocidio:progressUpdate`
+- `sudocidio:accusationResult`
+- `sudocidio:victory`
+
+React to Phaser:
+
+- `sudocidio:requestHint`
+- `sudocidio:makeAccusation`
+- `sudocidio:applySabotage`
+- `sudocidio:volumeChange`
+
+## Prerequisites
+
+- Node.js 18 or newer should work for the repo as a whole.
+- npm.
+- mapa/ dependencies installed separately, because this repo is not configured as an npm workspace.
+
+## Install
+
+From the `mapa/` directory:
+
+```bash
 npm install
 ```
 
-## New Phaser project - Setup
+## Run Standalone
 
-- Init npm and install necessary packages
+Build the standalone bundle:
 
-    ```powershell
-    npm init -y
-    npm install --save-dev typescript@4.9.4 ts-loader@9.4.2 webpack@5.75.0 webpack-cli@5.0.1 phaser@3.55.2 http-server@14.1.1 concurrently@7.6.0
-    ```
-- Create **Webpack** configuration `webpack.config.js`:
+```bash
+npm run build
+```
 
-    ```javascript
-    const path = require('path');
+Serve it:
 
-    module.exports = {
-    entry: './src/app.ts',
-    module: {
-        rules:[{
-            test: /\.tsx?$/,
-            use: 'ts-loader',
-            exclude: /node_modules/
-        }]
-    },
-    resolve: {
-        extensions: ['.ts', '.tsx', '.js']
-    },
-    output: {
-        filename: 'app.js',
-        path: path.resolve(__dirname, 'dist')
-    },
-    mode: 'development'
-    };
-    ```
+```bash
+npm run serve
+```
 
-- Webpack will get the sources from `src/app.ts` and collect everything in `dist/app.js` file
-- Create **TypeScript** configuration `tsconfig.json`:
+Open:
 
-    ```json
-    {
-        "compilerOptions": {
-            "target": "es5"
-        },
-        "include": [
-            "src/*"
-        ]
-    }
-    ```
+```text
+http://localhost:8085
+```
 
-- Download the [Phaser 3 definitions](https://github.com/photonstorm/phaser/tree/master/types) into the `src` subdirectory (`src/phaser.d.ts`)
-- Update the **scripts**-section of the `package.json` file. The nra script can be used if the npm packages were locally installed:
+For active standalone development, use two terminals:
 
-    ```json
-    "scripts": {
-        "build": "webpack",
-        "watch": "webpack --watch",
-        "serve": "http-server --port=8085 -c-1"
-    }
-    ```
+```bash
+npm run watch
+```
 
-- To build the application run:
+```bash
+npm run serve
+```
 
-    ```powershell
-    npm run-script build
-    ```
+Webpack writes the standalone bundle to:
 
-- To run multiple npm scripts cross platform in parallel run the following command:
+```text
+mapa/dist/app.js
+```
 
-    ```powershell
-    # if globally installed
-    concurrently npm:watch npm:serve
+## Normal App Development
 
-    # if locally installed
-    npx concurrently npm:watch npm:serve
-    ```
+For normal Sudocidio gameplay, you usually do not run `mapa/` separately. Start the root app and realtime server instead:
+
+Terminal 1, repo root:
+
+```bash
+npm run dev
+```
+
+Terminal 2, `server/`:
+
+```bash
+npx tsx server.ts
+```
+
+Then open:
+
+```text
+http://localhost:3000/game
+```
+
+The root app will load the Phaser scenes from `mapa/src` automatically.
+
+## Asset Notes
+
+The map source assets live in:
+
+```text
+mapa/assets/
+```
+
+The running Next app loads browser assets from:
+
+```text
+public/assets/
+```
+
+When adding or changing map art, make sure the runtime path used by Phaser, such as `/assets/weapons/knife.png`, exists under `public/assets` for the integrated Next app. Keep `mapa/assets` and `public/assets` in sync when needed.
+
+## Gotchas
+
+- `mapa/` is not configured as an npm workspace. Install its dependencies separately.
+- The standalone package uses Phaser 3, while the root package currently lists Phaser 4.
+- The standalone entry point is `mapa/src/app.ts`; the integrated Next app does not use that entry point.
+- The integrated app imports scene files from `mapa/src` directly, so TypeScript errors in `mapa/src` can affect the root app.
+- `GameScene` can use a URL seed with `?seed=123`, but in multiplayer the root app injects the seed through `window.__sudocidio_seed`.

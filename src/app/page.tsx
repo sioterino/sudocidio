@@ -9,7 +9,6 @@ import {
   CharacterDecor,
   Footer,
 } from "@/src/components/menu";
-import { useEffect } from "react";
 
 // SVG Icons for pixel-perfect rendering
 function PlayIcon() {

@@ -65,7 +65,7 @@ function findRoomBySocket(socketId: string): [string, Room] | null {
 
 async function sendPushToRoom(room: Room) {
   const payload = JSON.stringify({
-    title: "Sudocídio",
+    title: "Sudocídio (Push)",
     body: "Um oponente foi encontrado — o caso começa agora!",
   });
 

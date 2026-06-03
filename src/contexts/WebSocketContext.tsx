@@ -1,6 +1,5 @@
 "use client";
 
-import { notifyGameStart } from "@/lib/notifications";
 import { subscribeToPush } from "@/lib/pushNotification";
 import {
   createContext,
@@ -119,7 +118,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       setSeed(payload.seed);
       setMatchStatus("PLAYING");
       setGameOverData(null);
-      notifyGameStart();
     });
 
     socket.on("OPPONENT_PROGRESS", (payload: { opponentProgress: number }) => {

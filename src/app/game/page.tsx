@@ -17,7 +17,6 @@ import { ClueData } from "@/src/components/gameplay/CluesPanel";
 import { WebSocketProvider } from "@/src/contexts/WebSocketContext";
 import { useMultiplayer } from "@/src/hooks/useMultiplayer";
 import type { ServerGameOverReason } from "@/src/contexts/WebSocketContext";
-import { requestNotificationPermission } from "@/lib/notifications";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -243,7 +242,6 @@ function GamePageInner() {
     
     // inside GamePageInner, in the useEffect that calls findMatch():
       useEffect(() => {
-        requestNotificationPermission(); // ask permission before queuing
         findMatch();
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);

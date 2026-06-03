@@ -239,6 +239,12 @@ function GamePageInner() {
     findMatch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+    
+    // inside GamePageInner, in the useEffect that calls findMatch():
+      useEffect(() => {
+        findMatch();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
 
   // ── Tela de aguardo ───────────────────────────────────────────────────────
 

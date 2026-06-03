@@ -1,5 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { createServer } from "http";
+import webpush from "web-push";
+import "dotenv/config";
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -8,6 +10,14 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
 });
+
+// ─── VAPID ────────────────────────────────────────────────────────────────────
+
+webpush.setVapidDetails(
+  process.env.VAPID_MAILTO!,
+  process.env.VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +39,7 @@ interface Room {
 
 const rooms = new Map<string, Room>();
 let waitingPlayer: Player | null = null;
+const pushSubscriptions = new Map<string, PushSubscription>(); // socketId → sub
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,10 +63,35 @@ function findRoomBySocket(socketId: string): [string, Room] | null {
   return null;
 }
 
+async function sendPushToRoom(room: Room) {
+  const payload = JSON.stringify({
+    title: "Sudocídio",
+    body: "Um oponente foi encontrado — o caso começa agora!",
+  });
+
+  for (const player of room.players) {
+    const sub = pushSubscriptions.get(player.socketId);
+    if (!sub) continue;
+    try {
+      await webpush.sendNotification(sub as any, payload);
+      console.log(`[Push] Enviado para ${player.playerName}`);
+    } catch (err) {
+      console.error(`[Push] Falhou para ${player.playerName}:`, err);
+      pushSubscriptions.delete(player.socketId);
+    }
+  }
+}
+
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 
 io.on("connection", (socket: Socket) => {
   console.log(`[Socket] Conectado: ${socket.id}`);
+
+  // 0. PUSH SUBSCRIPTION
+  socket.on("PUSH_SUBSCRIBE", (sub: PushSubscription) => {
+    pushSubscriptions.set(socket.id, sub);
+    console.log(`[Push] Subscription salva para ${socket.id}`);
+  });
 
   // 1. MATCHMAKING
   socket.on("JOIN_ROOM", (payload: { playerId: string; playerName: string }) => {
@@ -86,6 +122,7 @@ io.on("connection", (socket: Socket) => {
       waitingPlayer = null;
 
       io.to(roomId).emit("GAME_START", { roomId, seed });
+      sendPushToRoom(room); // ← dispara push para os dois jogadores
       console.log(`[Room] ${roomId} criada | seed: ${seed}`);
     } else {
       waitingPlayer = newPlayer;
@@ -127,6 +164,7 @@ io.on("connection", (socket: Socket) => {
   // 5. DESCONEXÃO
   socket.on("disconnect", () => {
     console.log(`[Socket] Desconectado: ${socket.id}`);
+    pushSubscriptions.delete(socket.id); // limpa subscription
 
     if (waitingPlayer?.socketId === socket.id) {
       waitingPlayer = null;

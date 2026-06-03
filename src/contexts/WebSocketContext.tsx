@@ -1,6 +1,7 @@
 "use client";
 
 import { notifyGameStart } from "@/lib/notifications";
+import { subscribeToPush } from "@/lib/pushNotification";
 import {
   createContext,
   useContext,
@@ -80,7 +81,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
+    socket.on("connect", async () => {
+      setIsConnected(true);
+      const sub = await subscribeToPush();
+      if (sub) {
+        socket.emit("PUSH_SUBSCRIBE", sub);
+      }
+
       console.log("[WS] Conectado:", socket.id);
       setIsConnected(true);
 

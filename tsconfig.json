@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["google.accounts"],
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
